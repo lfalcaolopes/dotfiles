@@ -1,0 +1,7 @@
+visual-studio-code-bin
+postman-bin
+google-cloud-cli
+dbeaver
+steam
+zsh
+python-pipx
