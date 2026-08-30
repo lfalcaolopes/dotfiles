@@ -8,7 +8,7 @@ source "$REPO_ROOT/lib/common.sh"
 
 parse_module_args "$@"
 
-settings_source="$REPO_ROOT/config/vscode/settings.json"
+settings_source=${DOTFILES_VSCODE_MANAGED:-$REPO_ROOT/config/vscode/settings.json}
 extensions_file="$REPO_ROOT/packages/vscode-extensions.txt"
 settings_destination=${DOTFILES_VSCODE_SETTINGS:-$HOME/.config/Code/User/settings.json}
 settings_parent=$(dirname -- "$settings_destination")
@@ -28,8 +28,9 @@ if [[ $parent_resolved == "$repo_resolved" || $parent_resolved == "$repo_resolve
   die "destino do VS Code resolve para dentro do repositório; merge recusado: $settings_destination"
 fi
 
-jq -e 'type == "object"' "$settings_source" >/dev/null || \
-  die "fonte gerenciada do VS Code deve ser um objeto JSON: $settings_source"
+python3 "$REPO_ROOT/lib/jsonc_to_json.py" < "$settings_source" | \
+  jq -e 'type == "object"' >/dev/null || \
+  die "fonte gerenciada do VS Code deve ser um objeto JSON/JSONC: $settings_source"
 
 if [[ -e $settings_destination ]]; then
   python3 "$REPO_ROOT/lib/jsonc_to_json.py" < "$settings_destination" | \
@@ -38,7 +39,7 @@ if [[ -e $settings_destination ]]; then
 fi
 
 if [[ $DRY_RUN == true ]]; then
-  log_info "dry-run: mesclar preferências em $settings_destination"
+  log_info "dry-run: aplicar bloco gerenciado e preservar bloco local em $settings_destination"
   while IFS= read -r extension || [[ -n $extension ]]; do
     [[ -z $extension || $extension == \#* ]] && continue
     log_info "dry-run: instalar extensão VS Code se ausente: $extension"
@@ -47,17 +48,21 @@ if [[ $DRY_RUN == true ]]; then
 fi
 
 ensure_dir "$settings_parent"
-local_json=$(mktemp)
 merged_json=$(mktemp "$settings_parent/.settings.json.XXXXXX")
-trap 'rm -f -- "${local_json:-}" "${merged_json:-}"' EXIT
+trap 'rm -f -- "${merged_json:-}"' EXIT
 
-if [[ -e $settings_destination ]]; then
-  python3 "$REPO_ROOT/lib/jsonc_to_json.py" < "$settings_destination" > "$local_json"
-else
-  printf '{}\n' > "$local_json"
+divergences=$(python3 "$REPO_ROOT/lib/vscode_settings_merge.py" \
+  --managed "$settings_source" \
+  --destination "$settings_destination" \
+  --output "$merged_json") || die \
+  "falha ao montar as preferências do VS Code: $settings_destination"
+
+if [[ -n $divergences ]]; then
+  while IFS= read -r divergence; do
+    log_info "$divergence"
+  done <<< "$divergences"
 fi
 
-jq -S -s '.[0] * .[1]' "$local_json" "$settings_source" > "$merged_json"
 if [[ -e $settings_destination ]]; then
   chmod --reference="$settings_destination" "$merged_json"
 else
@@ -81,5 +86,4 @@ while IFS= read -r extension || [[ -n $extension ]]; do
 done < "$extensions_file"
 
 trap - EXIT
-rm -f -- "$local_json"
 log_info "VS Code convergido"

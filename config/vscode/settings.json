@@ -1,41 +1,61 @@
 {
+  // === EDITOR: Aparência e comportamento ===
   "editor.fontFamily": "JetBrains Mono",
   "editor.fontSize": 13,
   "editor.lineHeight": 1.8,
   "editor.fontLigatures": true,
-  "editor.rulers": [100],
+  "editor.rulers": [100], // Linha guia para limite de caracteres
+  // "editor.lineNumbers": "relative",
   "editor.cursorBlinking": "solid",
   "editor.renderLineHighlight": "gutter",
   "editor.minimap.enabled": false,
   "editor.scrollbar.horizontal": "hidden",
   "editor.smoothScrolling": true,
-  "editor.linkedEditing": true,
-  "editor.tabSize": 2,
-  "editor.inlineSuggest.enabled": true,
+  "editor.linkedEditing": true, // Edita automaticamente tags HTML relacionadas
+
+  // === EDITOR: Sugestões, formatação e salvamento ===
   "editor.suggest.insertMode": "replace",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
   "prettier.requireConfig": true,
-  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[html]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+
+  // === FORMATTERS POR LINGUAGEM ===
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // === EXPLORER ===
   "explorer.confirmDragAndDrop": false,
   "explorer.confirmDelete": false,
   "explorer.compactFolders": false,
   "explorer.fileNesting.enabled": true,
+
+  // === INTERFACE / WORKBENCH ===
   "workbench.startupEditor": "none",
   "workbench.sideBar.location": "right",
   "workbench.editor.labelFormat": "short",
   "workbench.statusBar.visible": false,
   "workbench.layoutControl.enabled": false,
+  // "workbench.activityBar.location": "hidden", // Ativa barra lateral
   "breadcrumbs.enabled": false,
   "window.commandCenter": false,
   "window.menuBarVisibility": "compact",
+
+  // === VIM ===
   "vim.surround": true,
   "vim.easymotion": true,
   "vim.hlsearch": true,
@@ -44,65 +64,96 @@
   "vim.highlightedyank.color": "rgba(75, 196, 205, 0.3)",
   "vim.highlightedyank.textColor": "white",
   "vim.leader": "<space>",
+
+  // === VIM: Keybindings personalizados ===
   "vim.insertModeKeyBindingsNonRecursive": [],
   "vim.normalModeKeyBindingsNonRecursive": [
+    // === MOVIMENTOS E AÇÕES PADRÃO MODIFICADAS ===
     { "before": ["z"], "after": ["z", "a"] },
     { "before": ["U"], "after": ["<c-r>"] },
     { "before": ["<c-u>"], "after": ["<c-u>", "z", "z"] },
     { "before": ["<c-d>"], "after": ["<c-d>", "z", "z"] },
     { "before": ["<c-a>"], "after": ["g", "g", "V", "G", "$"] },
     { "before": ["<c-f>"], "after": ["leader", "leader", "s"] },
+
+    // === NAVEGAÇÃO ENTRE BUFFERS ===
     { "before": ["<s-h>"], "commands": [":bprevious"] },
     { "before": ["<s-l>"], "commands": [":bnext"] },
     { "before": ["<s-x>"], "commands": ["workbench.action.closeActiveEditor"] },
+
+    // Navegação entre painéis (splits)
     { "before": ["<c-h>"], "commands": ["workbench.action.focusLeftGroup"] },
     { "before": ["<c-j>"], "commands": ["workbench.action.focusBelowGroup"] },
     { "before": ["<c-k>"], "commands": ["workbench.action.focusAboveGroup"] },
     { "before": ["<c-l>"], "commands": ["workbench.action.focusRightGroup"] },
+
+    // === UTILITÁRIOS / QUALIDADE DE VIDA ===
     { "before": ["<c-p>"], "after": ["\"", "0", "p"] },
     { "before": ["<c-y>"], "commands": ["editor.action.copyLinesDownAction"] },
     { "before": ["<Esc>"], "commands": [":nohlsearch"] },
+
+    // === BUSCA ===
     { "before": ["<leader>", "s", "f"], "commands": ["workbench.action.quickOpen"] },
     { "before": ["<leader>", "s", "d"], "commands": ["workbench.actions.view.problems"] },
     { "before": ["<leader>", "<leader>"], "commands": ["workbench.action.showAllEditors"] },
     { "before": ["g", "r"], "commands": ["editor.action.referenceSearch.trigger"] },
-    { "before": ["g", "i"], "commands": ["editor.action.goToImplementation"] }
+    { "before": ["g", "i"], "commands": ["editor.action.goToImplementation"] },
+
+    // === LSP / DIAGNOSTICOS ===
+    { "before": ["<leader>", "c", "a"], "commands": ["editor.action.quickFix"] },
+    { "before": ["<leader>", "c", "r"], "commands": ["editor.action.rename"] },
+    { "before": ["]", "d"], "commands": ["editor.action.marker.next"] },
+    { "before": ["[", "d"], "commands": ["editor.action.marker.prev"] },
+
+    // === ARQUIVO ===
+    { "before": ["<leader>", "w"], "commands": ["workbench.action.files.save"] }
   ],
+
+  // === VISUAL MODE ===
   "vim.visualModeKeyBindingsNonRecursive": [
+    // === INDENTAÇÃO SEM SAIR DO MODO VISUAL ===
     { "before": ["<"], "commands": ["editor.action.outdentLines"] },
     { "before": [">"], "commands": ["editor.action.indentLines"] },
+
+    // === COLAR SEM PERDER O REGISTRO COPIADO ===
     { "before": ["p"], "after": ["p", "g", "v", "y"] },
+
+    // === DUPLICAR LINHA (como no modo normal) ===
     { "before": ["<c-y>"], "commands": ["editor.action.copyLinesDownAction"] }
   ],
-  "git.enableSmartCommit": true,
-  "git.confirmSync": false,
-  "gitlens.advanced.messages": { "suppressCreatePullRequestPrompt": true },
+
+  // === TYPESCRIPT / JAVASCRIPT ===
   "typescript.updateImportsOnFileMove.enabled": "always",
   "javascript.updateImportsOnFileMove.enabled": "always",
-  "apc.listRow": { "height": 24 },
+
+  // === C# / DOTNET ===
+  "dotnetAcquisitionExtension.enableTelemetry": false,
+  "csharpextensions.includeNamespaces": false,
+  "csharpextensions.useFileScopedNamespace": true,
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp"
+  },
+
+  // === CUSTOMIZAÇÕES DE UI (com extensões específicas) ===
+  "apc.listRow": {
+    "height": 24
+  },
   "apc.stylesheet": {
     ".title-label > h2": "display: none",
     ".editor-actions": "display: none",
     ".split-view-view:first-child .pane-header": "display: none !important;"
   },
+
+  // === TELEMETRIA ===
   "telemetry.telemetryLevel": "off",
-  "chat.agent.enabled": true,
-  "csharpextensions.includeNamespaces": false,
-  "csharpextensions.useFileScopedNamespace": true,
-  "terminal.integrated.profiles.linux": {
-    "zsh": { "path": "/usr/bin/zsh" }
-  },
-  "terminal.integrated.defaultProfile.linux": "zsh",
-  "terminal.integrated.profiles.windows": {
-    "Nushell": { "path": "C:\\Users\\lfalc\\AppData\\Local\\Programs\\nu\\bin\\nu.exe" }
-  },
-  "terminal.integrated.defaultProfile.windows": "Nushell",
+
+  // === TERMINAL ===
   "terminal.integrated.fontFamily": "CaskaydiaMono Nerd Font",
   "terminal.integrated.fontSize": 14,
-  "prisma.hidePrisma6Prompts": true,
-  "chat.mcp.gallery.enabled": true,
-  "chat.viewSessions.orientation": "stacked",
-  "workbench.editorAssociations": { "*.pdf": "pdf.preview" },
-  "workbench.iconTheme": "material-icon-theme",
-  "workbench.list.typeNavigationMode": "trigger"
+
+  // === ASSOCIAÇÕES E ÍCONES ===
+  "workbench.editorAssociations": {
+    "*.pdf": "pdf.preview"
+  },
+  "workbench.iconTheme": "material-icon-theme"
 }

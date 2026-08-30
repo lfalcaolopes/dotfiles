@@ -56,9 +56,38 @@ Na máquina de origem:
 5. confira `git status` para garantir que nenhum arquivo versionado foi
    reescrito.
 
-O merge do VS Code preserva chaves locais não gerenciadas, inclusive o tema.
-Ele recusa um `settings.json` que seja symlink para evitar escrever no alvo do
-link.
+### settings.json do VS Code
+
+O arquivo instalado tem duas partes, separadas por uma sentinela em comentário:
+
+```jsonc
+  "workbench.iconTheme": "material-icon-theme",
+
+  // ==========================================================================
+  // dotfiles:local
+  // ...
+  // ==========================================================================
+
+  "workbench.colorTheme": "Hackerman"
+}
+```
+
+Acima da sentinela fica a cópia literal de `config/vscode/settings.json`, com
+os comentários e a ordem do repositório preservados. Esse bloco é reescrito por
+inteiro a cada execução, então editar ali pela interface do VS Code não
+persiste; o módulo registra `chave gerenciada divergente` antes de sobrescrever.
+
+Abaixo da sentinela ficam as preferências desta máquina, como o tema e as
+chaves que extensões injetam sozinhas. Elas sobrevivem entre execuções. Quando
+uma dessas chaves passa a ser gerenciada pelo repositório, ela é removida do
+bloco local para não duplicar.
+
+Remover uma chave de `config/vscode/settings.json` a remove do arquivo
+instalado na execução seguinte. Na primeira execução, antes de a sentinela
+existir, toda chave que não esteja no repositório é tratada como local.
+
+O módulo recusa um `settings.json` que seja symlink, para evitar escrever no
+alvo do link.
 
 ## 2. autenticar serviços
 

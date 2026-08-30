@@ -513,6 +513,7 @@ printf '%s\n' \
   '  // preferência local preservada' \
   '  "workbench.colorTheme": "Local Theme",' \
   '  "local.setting": "keep",' \
+  '  "editor.fontSize": 99,' \
   '}' > "$VSCODE_HOME/.config/Code/User/settings.json"
 printf 'ms-python.python\n' > "$VSCODE_INSTALLED"
 : > "$VSCODE_LOG"
@@ -542,12 +543,27 @@ run_editors_module() {
 run_editors_module
 assert_success "merge VS Code"
 settings_path="$VSCODE_HOME/.config/Code/User/settings.json"
-[[ $(jq -r '."workbench.colorTheme"' "$settings_path") == 'Local Theme' ]] || \
+settings_get() {
+  python3 "$TEST_ROOT/lib/jsonc_to_json.py" < "$settings_path" | jq -r "$1"
+}
+[[ $(settings_get '."workbench.colorTheme"') == 'Local Theme' ]] || \
   fail "merge removeu workbench.colorTheme local"
-[[ $(jq -r '."local.setting"' "$settings_path") == keep ]] || \
+[[ $(settings_get '."local.setting"') == keep ]] || \
   fail "merge removeu chave local"
-[[ $(jq -r '."workbench.iconTheme"' "$settings_path") == material-icon-theme ]] || \
+[[ $(settings_get '."workbench.iconTheme"') == material-icon-theme ]] || \
   fail "merge não aplicou chave gerenciada"
+[[ $(settings_get '."editor.fontSize"') == 13 ]] || \
+  fail "repositório não prevaleceu sobre chave gerenciada divergente"
+assert_contains "$OUTPUT" 'chave gerenciada divergente' "aviso de divergência"
+/usr/bin/grep -q '^[[:space:]]*//[[:space:]]*dotfiles:local[[:space:]]*$' "$settings_path" || \
+  fail "sentinela ausente no settings gerado"
+/usr/bin/grep -q '=== EDITOR: Aparência e comportamento ===' "$settings_path" || \
+  fail "comentários do bloco gerenciado foram perdidos"
+[[ $(/usr/bin/grep -c '"local.setting"' "$settings_path") == 1 ]] || \
+  fail "chave local duplicada ou ausente"
+sentinel_line=$(/usr/bin/grep -n 'dotfiles:local' "$settings_path" | cut -d: -f1)
+local_line=$(/usr/bin/grep -n '"local.setting"' "$settings_path" | cut -d: -f1)
+(( local_line > sentinel_line )) || fail "chave local não ficou abaixo da sentinela"
 settings_hash=$(sha256sum "$settings_path")
 extension_calls=$(wc -l < "$VSCODE_LOG")
 run_editors_module
@@ -556,6 +572,24 @@ assert_success "segundo merge VS Code"
   fail "merge VS Code não foi byte a byte estável"
 [[ $extension_calls == "$(wc -l < "$VSCODE_LOG")" ]] || \
   fail "extensões VS Code foram reinstaladas"
+
+MANAGED_TRIMMED="$SANDBOX/vscode-managed-trimmed.json"
+/usr/bin/grep -v '"workbench.iconTheme"' "$TEST_ROOT/config/vscode/settings.json" \
+  > "$MANAGED_TRIMMED"
+set +e
+OUTPUT=$(env HOME="$VSCODE_HOME" XDG_CONFIG_HOME="$VSCODE_HOME/.config" \
+  PATH="$VSCODE_SHIMS:/usr/bin:/bin" \
+  DOTFILES_VSCODE_MANAGED="$MANAGED_TRIMMED" \
+  "$TEST_ROOT/modules/50-editors.sh" notebook 2>&1)
+STATUS=$?
+set -e
+assert_success "remoção de chave gerenciada"
+[[ $(settings_get '."workbench.iconTheme" // "ausente"') == ausente ]] || \
+  fail "chave removida do repositório sobreviveu no destino"
+[[ $(settings_get '."local.setting"') == keep ]] || \
+  fail "remoção no repositório derrubou chave local"
+run_editors_module
+assert_success "merge VS Code restaurado"
 
 symlink_target="$SANDBOX/vscode-symlink-target.json"
 printf '{"safe":true}\n' > "$symlink_target"
@@ -574,7 +608,7 @@ assert_failure "symlink de settings VS Code"
 assert_contains "$OUTPUT" 'é symlink; merge recusado' "symlink de settings VS Code"
 [[ $target_hash == "$(sha256sum "$symlink_target")" ]] || \
   fail "alvo do symlink VS Code foi alterado"
-pass "merge VS Code preserva chaves locais, converge e recusa symlink"
+pass "merge VS Code preserva bloco local, propaga remoções, converge e recusa symlink"
 
 TWEAK_HOME="$SANDBOX/tweak-home"
 mkdir -p "$TWEAK_HOME/.config"
@@ -616,9 +650,13 @@ pass "mise fixa exatamente Node 24, pnpm 12 e .NET SDK 10"
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"
 done
-jq empty "$TEST_ROOT/config/vscode/settings.json"
+python3 "$TEST_ROOT/lib/jsonc_to_json.py" \
+  < "$TEST_ROOT/config/vscode/settings.json" | jq empty
+python3 "$TEST_ROOT/lib/jsonc_to_json.py" \
+  < "$TEST_ROOT/stow/common/.config/Code/User/keybindings.json" | \
+  jq -e 'type == "array"' >/dev/null
 PYTHONPYCACHEPREFIX="$SANDBOX/pycache" python3 -m py_compile \
-  "$TEST_ROOT/lib/jsonc_to_json.py"
+  "$TEST_ROOT/lib/jsonc_to_json.py" "$TEST_ROOT/lib/vscode_settings_merge.py"
 for lua_file in $(find "$TEST_ROOT/stow" -type f -name '*.lua' | sort); do
   luac -p "$lua_file"
 done
