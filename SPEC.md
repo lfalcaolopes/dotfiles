@@ -1,7 +1,8 @@
 # Plano de implementação: dotfiles reproduzíveis para Omarchy
 
-> Estado: plano consolidado; implementação ainda não iniciada; duas entradas
-> de validação estão listadas na seção 10.
+> Estado: plano consolidado; implementação ainda não iniciada; o fluxo
+> `desktop` pode ser implementado e validado com um override no-op, mas sua
+> segunda tela continuará incompleta até a captura indicada na seção 10.
 > Diagnóstico de origem: 2026-08-29 e 2026-08-30.
 > Ambiente de referência: Acer Nitro AN515-55, Omarchy `BUILD_ID 4.0.1`,
 > kernel `7.1.9-arch1-2`, usuário `lfalcao`, shell `/usr/bin/zsh`.
@@ -19,16 +20,18 @@ O resultado deve reproduzir somente as preferências declaradas pelo usuário.
 Defaults, arquivos gerados e estado de runtime do Omarchy não devem ser
 copiados da máquina atual.
 
-O trabalho está concluído quando:
+O bootstrap v1 está concluído quando:
 
-1. `./bootstrap.sh notebook` e `./bootstrap.sh desktop` possuem fluxos válidos;
+1. `./bootstrap.sh notebook` e `./bootstrap.sh desktop` possuem fluxos válidos,
+   ainda que o segundo monitor do desktop permaneça uma pendência de hardware;
 2. uma segunda execução não causa erro nem duplica configuração;
 3. Python, JavaScript/TypeScript e C#/.NET estão prontos para desenvolvimento;
 4. configurações comuns, específicas do Omarchy e específicas de host estão
    isoladas;
 5. segredos e estado local não entram no repositório;
 6. tudo que exige interação humana está documentado em `docs/MANUAL.md`;
-7. as verificações da seção 9 passam.
+7. as verificações automatizáveis da seção 9 passam, e as verificações humanas
+   ou dependentes de hardware ficam documentadas com seu resultado ou bloqueio.
 
 ## 2. Regras que não podem ser violadas
 
@@ -137,8 +140,15 @@ Requisitos:
 
 - sem host, sair com erro e listar hosts encontrados em `stow/host-*`;
 - rejeitar host e módulo desconhecidos;
-- `--only` executa um módulo sem executar os demais;
-- `--dry-run` descreve mudanças sem realizá-las;
+- `--only` aceita exclusivamente o basename de um arquivo em `modules/`, sem a
+  extensão `.sh` (por exemplo, `10-packages`), e executa somente esse módulo;
+- cada módulo valida por conta própria suas dependências de comandos, arquivos,
+  argumentos e estado anterior, inclusive quando chamado por `--only`;
+- `--dry-run` descreve mudanças sem realizá-las e não chama nenhum comando
+  mutável. Isso inclui `sudo -v`, gerenciadores de pacotes, clones ou pulls,
+  `chsh`, `systemctl`, instalação de extensões e `mise use`;
+- em dry-run, validações que exigiriam um comando mutável devem apenas verificar
+  pré-condições por meios somente leitura e informar o que seria executado;
 - propagar falhas com mensagem que identifique o módulo;
 - não assumir que o diretório atual é a raiz do repositório;
 - reexecução deve convergir para o mesmo estado.
@@ -148,7 +158,8 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 
 ### 4.2 Ordem dos módulos
 
-1. `00-preflight.sh`: validar Omarchy/Arch, rede e `sudo`; garantir Git e Stow.
+1. `00-preflight.sh`: validar Omarchy/Arch, rede e, fora do dry-run, `sudo`;
+   garantir Git e Stow. No dry-run, apenas relatar instalações necessárias.
 2. `10-packages.sh`: instalar pacotes comuns e do host.
 3. `20-stow-common.sh`: aplicar `stow/common`.
 4. `30-stow-omarchy.sh`: aplicar `stow/omarchy`.
@@ -172,6 +183,27 @@ Numa instalação nova, a ordem externa ao bootstrap é:
 3. clonar este repositório;
 4. executar `./bootstrap.sh notebook` ou `./bootstrap.sh desktop`;
 5. concluir os passos interativos de `docs/MANUAL.md`.
+
+### 4.4 Estratégia de testes
+
+Testes de bootstrap devem executar com um `HOME` temporário, fixtures mínimas
+para representar os arquivos existentes e um `PATH` controlado com shims para
+comandos externos. Os shims devem registrar chamadas e permitir simular
+sucesso, ausência e falha sem usar a configuração ou os serviços da estação.
+Nenhum teste automatizado pode depender do `$HOME` real.
+
+São automatizáveis: parsing e rejeição de argumentos, descoberta de hosts,
+seleção por `--only`, validação isolada das dependências de cada módulo,
+ordenação, propagação de erros, contrato de dry-run, migração dos conflitos do
+Stow, merges e idempotência de arquivos. O teste de dry-run deve falhar se o
+log dos shims registrar qualquer comando mutável proibido na seção 4.1.
+
+São verificações humanas ou dependentes de hardware: autenticações, teclas em
+terminal/tmux/SSH, reload e erros do Hyprland, EDID/modo/posição e refresh rate
+dos monitores, regras de janela e classe real do DBeaver, além do funcionamento
+físico do kanata. Elas não bloqueiam testes automatizados quando o hardware ou
+a sessão gráfica correspondente não está disponível; o resultado ou bloqueio
+deve ser registrado no manual.
 
 ## 5. Plano de implementação
 
@@ -200,6 +232,10 @@ Critérios de aceite:
 - execução sem host falha antes de alterar a máquina;
 - hosts inválidos falham antes de alterar a máquina;
 - dry-run percorre o plano completo sem escrever;
+- dry-run não invoca nenhum comando mutável, comprovado pelo log dos shims;
+- cada valor aceito por `--only` funciona em teste isolado, e nomes com `.sh`
+  ou inexistentes são rejeitados antes de qualquer alteração;
+- a suíte usa `HOME` temporário e não altera a estação de trabalho;
 - ShellCheck não encontra erros relevantes, se estiver disponível.
 
 ### Fase 2 — pacotes
@@ -255,6 +291,29 @@ Popular `stow/common` com:
 
 Capturar o conteúdo da máquina de origem somente depois de aplicar as regras a
 seguir.
+
+#### Migração inicial para o Stow
+
+A máquina de origem já possui arquivos regulares nos destinos que passarão a
+ser gerenciados. Depois de capturar e revisar cada arquivo no pacote correto, o
+módulo Stow deve tratar cada folha conflitante antes de criar links:
+
+1. criar um diretório de backup exclusivo sob
+   `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/backups/<timestamp>/`;
+2. copiar o arquivo ou symlink conflitante com metadados e caminho relativo
+   preservados, verificar que o backup existe e só então remover a folha do
+   destino;
+3. abortar sem sobrescrever backups ou remover diretórios que contenham itens
+   não gerenciados;
+4. executar `stow --restow` somente após todos os conflitos do pacote estarem
+   protegidos e registrar o caminho do backup para o usuário.
+
+Nunca usar `stow --adopt`: ele pode reescrever a cópia versionada com o estado
+local. Links já corretos não são conflitos e a reexecução não deve criar novo
+backup. Em `--dry-run`, apenas listar conflitos, destinos de backup e comandos
+planejados, sem criar, copiar, remover ou chamar Stow. Testar esse fluxo com
+fixtures em um `HOME` temporário, incluindo arquivo regular, symlink incorreto,
+link já correto e diretório com conteúdo não gerenciado.
 
 #### `.zshrc`
 
@@ -458,8 +517,11 @@ copiar seu `.git`.
 
 Fornecer `.config/hypr/host.lua` com a mesma intenção: segundo monitor e
 workspaces 6–10. O identificador EDID, modo e posição desse monitor ainda
-precisam ser capturados no desktop. Até isso ocorrer, o arquivo deve ser
-deliberadamente explícito sobre a pendência e não inventar um conector.
+precisam ser capturados no desktop. Até isso ocorrer, o arquivo deve ser Lua
+válida, conter apenas comentários explícitos sobre a pendência e não executar
+configuração alguma nem inventar um conector. Esse no-op torna o fluxo de
+bootstrap do desktop válido, mas não conclui sua configuração física nem fixa
+os workspaces 6–10.
 
 Critérios de aceite:
 
@@ -469,6 +531,8 @@ Critérios de aceite:
 - Brave, Code, Postman, Steam e WhatsApp caem nos workspaces definidos;
 - validar a classe real do DBeaver com `hyprctl clients`;
 - uma máquina sem touchpad aceita `input.lua` sem erro.
+- o `host.lua` provisório do desktop passa no parser como no-op; EDID, modo,
+  posição e workspaces 6–10 só são aceitos após validação no hardware desktop.
 
 ### Fase 5 — shell, kanata e mise
 
@@ -635,7 +699,9 @@ Documentar que o flag `silent` pode abrir aplicativos em workspaces não visíve
 quando o notebook estiver com apenas um monitor. Isso é comportamento esperado.
 
 Executar o bootstrap completo em dry-run, depois no notebook, depois novamente
-no notebook. Registrar no README ou manual qualquer pré-condição encontrada.
+no notebook. Antes da aplicação real, executar a suíte isolada da seção 4.4.
+Registrar no README ou manual qualquer pré-condição, verificação humana ou
+bloqueio de hardware encontrado.
 
 ## 6. Matriz de ownership
 
@@ -750,6 +816,8 @@ Portanto, existência e diferença local não provam intenção do usuário.
 
 ## 9. Checklist global de validação
 
+### Automatizável com `HOME` temporário, fixtures e shims
+
 ### Estrutura e segurança
 
 - [ ] Git reconhece o repositório e há commits incrementais.
@@ -765,6 +833,8 @@ Portanto, existência e diferença local não provam intenção do usuário.
 - [ ] Segunda execução não duplica linhas, plugins, extensões ou JSON.
 - [ ] Stow não toma posse de arquivos gerenciados externamente.
 - [ ] Merge do VS Code e tweaks produzem saída estável.
+
+### Pós-aplicação, humana ou dependente do ambiente/hardware
 
 ### Ambiente de desenvolvimento
 
@@ -782,7 +852,9 @@ Portanto, existência e diferença local não provam intenção do usuário.
 - [ ] Repetir os testes de teclas dentro de tmux e SSH.
 - [ ] Hyprland recarrega sem `configerrors`.
 - [ ] Acer opera em 165 Hz e workspaces 1–5 estão nele.
-- [ ] Workspaces 6–10 estão na segunda tela de cada host.
+- [ ] Workspaces 6–10 estão na segunda tela do notebook.
+- [ ] Depois da captura pendente, workspaces 6–10 estão na segunda tela do
+  desktop; até lá, o `host.lua` desktop é um no-op Lua válido.
 - [ ] Regras de janela e comportamento `silent` foram validados.
 - [ ] Kanata está ativo apenas no notebook.
 
@@ -792,10 +864,12 @@ Estas são as únicas informações ainda não resolvidas; não confundir com de
 já fechadas:
 
 1. O segundo monitor do desktop ainda não teve descrição EDID, modo e posição
-   capturados. Isso bloqueia apenas a finalização de `host-desktop/host.lua`, não
-   a estrutura nem o bootstrap.
+   capturados. Isso bloqueia apenas sua configuração física e a fixação dos
+   workspaces 6–10, não a estrutura, os testes automatizados nem um fluxo de
+   bootstrap desktop válido com `host.lua` no-op.
 2. A classe real do DBeaver deve ser confirmada com `hyprctl clients`; a regra
-   proposta usa `^([dD][bB]eaver)$` com base no `StartupWMClass`.
+   proposta usa `^([dD][bB]eaver)$` com base no `StartupWMClass`. Isso bloqueia
+   apenas a aceitação humana dessa regra, não os testes automatizados.
 
 Qualquer nova pendência descoberta deve ser registrada aqui com impacto e forma
 de validação. Não usar esta seção como diário de decisões concluídas.
