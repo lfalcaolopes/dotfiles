@@ -67,7 +67,7 @@ Nunca versionar:
 - `~/.ssh/`, `~/.gnupg/`, `~/.claude.json`;
 - `~/.config/gh/hosts.yml`;
 - credenciais do gcloud, Docker, 1Password ou Claude;
-- `~/.config/tarefas-arduino/`;
+- diretórios de configuração de projetos pessoais que têm repositório próprio;
 - arquivos `.ovpn`;
 - históricos, caches, perfis de navegador ou storage do VS Code.
 
@@ -730,7 +730,7 @@ Não reabrir estas decisões durante o v1 sem nova evidência ou pedido do usuá
 - configurações são divididas em `common`, `omarchy` e `host-*`;
 - `settings.json` do VS Code é merge, não symlink;
 - `git/config` e `mise/config.toml` não são versionados;
-- tarefas-arduino permanece em seu repositório próprio;
+- projetos pessoais permanecem em seus próprios repositórios;
 - agentes e memórias do Claude não entram;
 - não há bloco dconf;
 - `tweaks.sh` faz parte do v1;
@@ -761,8 +761,8 @@ Não capturar:
 - `~/.local/share/fonts/omarchy.ttf`: gerado por `omarchy font set`;
 - caches, backups, históricos e perfis.
 
-Os scripts `tarefas-arduino`, `tarefas-daily` e `tarefas-fetch`, suas units e
-seus segredos pertencem a `lfalcaolopes/tarefas-arduino`. Não copiá-los.
+Os scripts, units e segredos de projetos pessoais que já têm repositório
+próprio pertencem a esses repositórios. Não copiá-los para cá.
 
 ### 8.2 Pacotes deliberadamente excluídos
 
