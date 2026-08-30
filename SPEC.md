@@ -245,7 +245,6 @@ Criar `packages/core.txt` com:
 ```text
 visual-studio-code-bin
 postman-bin
-google-cloud-cli
 dbeaver
 steam
 zsh
@@ -260,8 +259,8 @@ kanata-bin
 
 Não criar `host-desktop.txt` vazio; o módulo deve aceitar sua ausência.
 
-No módulo, separar pacotes oficiais de AUR. `google-cloud-cli` e `postman-bin`
-são AUR; os demais estão em repositórios configurados pelo Omarchy. Usar:
+No módulo, separar pacotes oficiais de AUR. `postman-bin` e `kanata-bin` são
+AUR; os demais estão em repositórios configurados pelo Omarchy. Usar:
 
 ```bash
 sudo pacman -S --needed --noconfirm ...
@@ -682,8 +681,7 @@ Criar `docs/MANUAL.md` na ordem real de uso:
 
 1. instalar Brave com `omarchy install browser brave` e defini-lo como padrão,
    caso isso não tenha sido feito antes do clone;
-2. autenticar GitHub (`gh`), gcloud, Slack, Signal, Steam, Docker Hub e
-   navegador;
+2. autenticar GitHub (`gh`), Slack, Signal, Steam, Docker Hub e navegador;
 3. gerar uma nova chave SSH e registrá-la no GitHub;
 4. importar chave GPG somente se ainda necessária;
 5. instalar 1Password pelo menu do Omarchy;

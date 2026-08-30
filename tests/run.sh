@@ -211,11 +211,20 @@ assert_success "separação de pacotes"
 shim_calls=$(<"$SHIM_LOG")
 assert_contains "$shim_calls" 'sudo pacman -S --needed --noconfirm visual-studio-code-bin dbeaver steam zsh python-pipx' \
   "pacotes oficiais"
-assert_contains "$shim_calls" 'yay -S --needed --noconfirm postman-bin google-cloud-cli' \
+assert_contains "$shim_calls" 'yay -S --needed --noconfirm postman-bin' \
   "pacotes AUR"
 run_bootstrap desktop --only 10-packages
 assert_success "reexecução de pacotes"
 assert_contains "$OUTPUT" 'pacotes convergidos para o host desktop' "reexecução de pacotes"
+
+reset_log
+run_bootstrap notebook --only 10-packages
+assert_success "separação de pacotes do notebook"
+shim_calls=$(<"$SHIM_LOG")
+assert_contains "$shim_calls" 'yay -S --needed --noconfirm postman-bin kanata-bin' \
+  "kanata-bin é AUR"
+[[ $(/usr/bin/grep -c '^sudo pacman -S .*kanata-bin' "$SHIM_LOG") -eq 0 ]] || \
+  fail "kanata-bin foi roteado para o pacman"
 pass "pacotes oficiais e AUR usam comandos separados e convergem na reexecução"
 
 CONTROLLED_MODULES="$SANDBOX/modules"

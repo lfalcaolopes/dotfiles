@@ -40,7 +40,7 @@ for package in "${packages[@]}"; do
   seen[$package]=1
 
   case $package in
-    google-cloud-cli|postman-bin) aur+=("$package") ;;
+    postman-bin|kanata-bin) aur+=("$package") ;;
     *) official+=("$package") ;;
   esac
 done

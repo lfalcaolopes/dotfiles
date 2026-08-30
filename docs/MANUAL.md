@@ -33,6 +33,10 @@ mantém o segundo monitor como pendência documentada.
    ./bootstrap.sh desktop
    ```
 
+A execução real para duas vezes pedindo senha: o `00-preflight` roda `sudo -v`
+e o `40-shell` roda `chsh` para trocar o shell padrão para o zsh, que pede a
+senha do próprio usuário. O dry-run não pede nenhuma das duas.
+
 O bootstrap não oferece troca automática de host. Para trocar um host já
 aplicado, remova primeiro os links da camada antiga com
 `stow -D -d stow -t "$HOME" host-<host-antigo>` e só então execute o novo
@@ -94,7 +98,6 @@ alvo do link.
 Conclua os logins que não podem ser automatizados:
 
 - GitHub, com `gh auth login`;
-- Google Cloud, com `gcloud auth login`;
 - Slack, Signal, Steam, Docker Hub e o perfil do navegador;
 - perfil secundário do Claude, com `claude-dio` e depois `/login`.
 
@@ -173,7 +176,10 @@ Confirme os seguintes pontos:
 - classe real do DBeaver. A regra atual usa `^([dD][bB]eaver)$`, inferida de
   `StartupWMClass`, e precisa ser confirmada em `hyprctl clients`;
 - no notebook, `systemctl --user status kanata.service` e o comportamento
-  físico das teclas.
+  físico das teclas: Caps toca Escape e, mantido, abre a camada de navegação
+  com as setas em `hjkl`; Caps+Space aplica Caps Lock; Space não ativa camada
+  alguma; os home row mods de `asdf` e `jkl;` respondem sem esperar o timeout
+  um do outro.
 
 O modificador `silent` pode abrir aplicativos em workspaces não visíveis
 quando o notebook estiver usando somente um monitor. Esse comportamento é

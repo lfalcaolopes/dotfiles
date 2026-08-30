@@ -2,8 +2,8 @@
 ;; Derived from the ZMK Corne layout at github.com/lfalcaolopes/corne-layout
 ;; (config/corne.keymap, default_layer middle row).
 ;;
-;; Home row mods plus a Space-held navigation layer. Caps is Escape on the
-;; base layer and remains available as Caps Lock through Space+Caps.
+;; Home row mods plus a Caps-held navigation layer. Tapping Caps sends Escape;
+;; Caps Lock remains available through Caps+Space.
 
 (defcfg
   ;; Internal laptop keyboard only. i8042 is the PS/2 controller, which is
@@ -13,6 +13,10 @@
 
   ;; Keys outside defsrc pass through untouched.
   process-unmapped-keys yes
+
+  ;; Let overlapping tap-hold keys run their timers concurrently, so chained
+  ;; home-row modifiers do not wait for each other's timeout to finish.
+  concurrent-tap-hold yes
 )
 
 (defvar
@@ -64,10 +68,9 @@
 ;; The -release variant is ZMK's hold-trigger-on-release: the interrupting key
 ;; must be pressed AND released before the hold commits.
 (defalias
-  ;; Match the Corne's Nav thumb key: tap Space normally, or hold it for the
-  ;; navigation layer. Plain tap-hold matches ZMK's tap-preferred behavior:
-  ;; the layer activates on timeout, avoiding accidental arrows while typing.
-  spc  (tap-hold $quick-tap $tap-term-fast spc (layer-while-held nav))
+  ;; Tap Caps for Escape, or hold it for the navigation layer. Caps is much
+  ;; less frequent than Space, reducing accidental layer activations.
+  capsnav (tap-hold $quick-tap $tap-term-fast esc (layer-while-held nav))
 
   a    (tap-hold-opposite-hand-release $tap-term      a lmet
          (timeout hold) (same-hand tap) (unknown-hand tap)
@@ -115,18 +118,17 @@
 (deflayer base
   grv  1    2    3    4    5    6    7    8    9    0    -    =    bspc
   tab  q    w    e    r    t    y    u    i    o    p    [    ]    \
-  esc  @a   @s   @d   @f   g    h    @j   @k   @l   @semi '   ret
+  @capsnav @a @s   @d   @f   g    h    @j   @k   @l   @semi '   ret
   lsft z    x    c    v    b    n    m    ,    .    /    rsft
-  lctl lmet lalt           @spc           ralt rctl
+  lctl lmet lalt           spc            ralt rctl
 )
 
-;; Same Vim-motion arrow positions as the Corne Nav layer. Everything else is
-;; transparent, so existing base-layer behavior (including home row mods) is
-;; preserved while Space is held.
+;; Same Vim-motion arrow positions as the Corne Nav layer. Caps+Space provides
+;; Caps Lock; everything else is transparent while Caps is held.
 (deflayer nav
   _    _    _    _    _    _    _    _    _    _    _    _    _    _
   _    _    _    _    _    _    _    _    _    _    _    _    _    _
   caps _    _    _    _    _    left down up   rght _    _    _
   _    _    _    _    _    _    _    _    _    _    _    _
-  _    _    _                  _              _    _
+  _    _    _                  caps           _    _
 )
