@@ -1,0 +1,17 @@
+# Editor and operating-system leftovers
+*~
+*.swp
+*.swo
+.DS_Store
+
+# Local test output
+.tmp/
+coverage/
+
+# Secrets and machine-local artifacts must never be captured here
+*.ovpn
+.env
+.env.*
+!.env.example
+*.key
+*.pem
