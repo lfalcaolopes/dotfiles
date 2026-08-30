@@ -64,6 +64,38 @@ for command in sudo pacman yay git stow chsh systemctl code mise mkdir cp mv rm 
 done
 make_shim curl readonly
 
+# stow -n e kanata --check não escrevem no disco: os shims não os registram como
+# mutação, e as variáveis abaixo permitem simular uma validação que reprova.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'for argument in "$@"; do'
+  printf '%s\n' '  case $argument in'
+  printf '%s\n' '    -n|--simulate|--no) exit "${STOW_SIMULATION_STATUS:-0}" ;;'
+  printf '%s\n' '  esac'
+  printf '%s\n' 'done'
+  # The generated shim expands these variables when it runs.
+  # shellcheck disable=SC2016
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/stow"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'for argument in "$@"; do'
+  printf '%s\n' '  [[ $argument == --check ]] && exit "${KANATA_CHECK_STATUS:-0}"'
+  printf '%s\n' 'done'
+  # The generated shim expands these variables when it runs.
+  # shellcheck disable=SC2016
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/kanata"
+
+chmod +x "$SHIMS/stow" "$SHIMS/kanata"
+
 export SHIM_LOG
 TEST_PATH="$SHIMS:/usr/bin:/bin"
 OUTPUT=
@@ -396,6 +428,43 @@ assert_contains "$OUTPUT" 'proteger conflito' "dry-run Stow lista conflito"
 assert_contains "$OUTPUT" 'aplicar Stow' "dry-run Stow lista comando"
 pass "dry-run Stow relata conflitos e não altera o HOME temporário"
 
+CLEAN_STOW_HOME="$SANDBOX/clean-stow-home"
+mkdir -p "$CLEAN_STOW_HOME"
+set +e
+OUTPUT=$(env \
+  HOME="$CLEAN_STOW_HOME" \
+  PATH="/usr/bin:/bin" \
+  DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
+  DOTFILES_STOW_TARGET="$CLEAN_STOW_HOME" \
+  "$TEST_ROOT/modules/20-stow-common.sh" notebook --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_success "simulação do Stow em destino limpo"
+assert_contains "$OUTPUT" 'dry-run: stow: ' "simulação do Stow em destino limpo"
+[[ -z $(find "$CLEAN_STOW_HOME" -mindepth 1 -print) ]] || \
+  fail "simulação do Stow escreveu no destino"
+pass "dry-run simula o Stow em destino limpo sem escrever nada"
+
+reset_log
+STOW_SIMULATION_STATUS=1
+export STOW_SIMULATION_STATUS
+run_bootstrap notebook --only 20-stow-common --dry-run
+unset STOW_SIMULATION_STATUS
+assert_failure "simulação do Stow reprovada"
+assert_contains "$OUTPUT" 'simulação do Stow falhou para common' "simulação do Stow reprovada"
+assert_no_mutation "simulação do Stow reprovada"
+pass "dry-run aborta quando a simulação do Stow reprova"
+
+reset_log
+KANATA_CHECK_STATUS=1
+export KANATA_CHECK_STATUS
+run_bootstrap notebook --only 45-kanata --dry-run
+unset KANATA_CHECK_STATUS
+assert_failure "config Kanata inválida"
+assert_contains "$OUTPUT" 'config do Kanata é inválida' "config Kanata inválida"
+assert_no_mutation "config Kanata inválida"
+pass "dry-run aborta quando a config do Kanata não passa no --check"
+
 SHELL_HOME="$SANDBOX/shell-home"
 SHELL_SHIMS="$SANDBOX/shell-shims"
 mkdir -p "$SHELL_HOME/.config" "$SHELL_SHIMS"
@@ -655,6 +724,54 @@ assert_success "linhas mise"
 [[ $(<"$SHIM_LOG") == $'mise use -g node@24\nmise use -g pnpm@12\nmise use -g dotnet@10' ]] || \
   fail "comandos mise incorretos: $(<"$SHIM_LOG")"
 pass "mise fixa exatamente Node 24, pnpm 12 e .NET SDK 10"
+
+# Máquina recém-instalada: só o que o Omarchy já traz está no PATH e o HOME
+# ainda não tem os arquivos que os módulos anteriores criariam. O dry-run deve
+# planejar tudo em vez de abortar.
+# A máquina de desenvolvimento já tem tudo instalado, então o PATH da máquina
+# zerada é um espelho de /usr/bin sem as ferramentas que os módulos instalam.
+FRESH_HOME="$SANDBOX/fresh-home"
+FRESH_BIN="$SANDBOX/fresh-bin"
+mkdir -p "$FRESH_HOME" "$FRESH_BIN"
+for real_command in /usr/bin/*; do
+  [[ -x $real_command ]] || continue
+  ln -sfn -- "$real_command" "$FRESH_BIN/${real_command##*/}"
+done
+for absent in stow zsh mise kanata code; do
+  rm -f -- "$FRESH_BIN/$absent"
+done
+for command in sudo pacman yay systemctl chsh curl; do
+  ln -sfn -- "$SHIMS/$command" "$FRESH_BIN/$command"
+done
+
+reset_log
+set +e
+OUTPUT=$(env \
+  HOME="$FRESH_HOME" \
+  XDG_CONFIG_HOME="$FRESH_HOME/.config" \
+  PATH="$FRESH_BIN" \
+  DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+  DOTFILES_STOW_TARGET="$FRESH_HOME" \
+  DOTFILES_OS_RELEASE="$OS_RELEASE" \
+  DOTFILES_CURRENT_SHELL=/bin/bash \
+  "$BOOTSTRAP" notebook --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_success "dry-run em máquina sem stow"
+for planned in \
+  'dry-run: seriam instalados: stow' \
+  'dry-run: stow ainda não existe' \
+  'dry-run: zsh ainda não existe' \
+  'dry-run: kanata ainda não existe' \
+  'dry-run: mise ainda não existe' \
+  'dry-run: code ainda não existe'; do
+  assert_contains "$OUTPUT" "$planned" "dry-run em máquina sem stow"
+done
+assert_contains "$OUTPUT" 'bootstrap concluído para notebook' "dry-run em máquina sem stow"
+[[ -z $(find "$FRESH_HOME" -mindepth 1 -print) ]] || \
+  fail "dry-run em máquina sem stow escreveu no HOME"
+assert_no_mutation "dry-run em máquina sem stow"
+pass "dry-run planeja em máquina recém-instalada sem stow, zsh, kanata nem mise"
 
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"

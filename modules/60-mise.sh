@@ -7,7 +7,9 @@ readonly REPO_ROOT
 source "$REPO_ROOT/lib/common.sh"
 
 parse_module_args "$@"
-require_command mise
+if ! require_provisioned_command mise "o Omarchy"; then
+  log_info "dry-run: os comandos abaixo dependem do mise instalado"
+fi
 
 run_mutating "fixar Node 24 global" mise use -g node@24
 run_mutating "fixar pnpm 12 global" mise use -g pnpm@12

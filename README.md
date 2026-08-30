@@ -7,9 +7,19 @@ runtime state dragged over from the old box.
 ```bash
 git clone https://github.com/lfalcaolopes/dotfiles.git
 cd dotfiles
-./bootstrap.sh notebook --dry-run   # review
-./bootstrap.sh notebook             # apply
+./bootstrap.sh notebook --only 00-preflight   # installs git and stow
+./bootstrap.sh notebook --dry-run             # review
+./bootstrap.sh notebook                       # apply
+./bootstrap.sh notebook --dry-run             # confirm nothing is left to do
 ```
+
+The preflight step comes first because `--dry-run` can only check what is
+already installed. With Stow present it simulates the symlink plan (`stow -n`)
+instead of just printing the command. Skipping it still works: the dry run
+reports each missing tool as `ainda não existe` and plans the rest.
+
+The last dry run is the real check. It should print no mutation line, which is
+what makes the run idempotent.
 
 Host is a required argument, not detected from the hostname. `notebook` has the
 internal panel and Kanata; `desktop` has two monitors and no Kanata.
@@ -32,10 +42,13 @@ SPEC.md               full plan and the reasoning behind it
 ## what the tests cover
 
 `tests/run.sh` uses a temp `HOME` and `PATH` shims, so it never touches the real
-machine. It checks three things:
+machine. It checks:
 
 - `--dry-run` prints everything and mutates nothing: no `sudo -v`, no package
-  manager, no `chsh`, no `systemctl`.
+  manager, no `chsh`, no `systemctl`. Only read-only probes run: `stow -n` and
+  `kanata --check`.
+- `--dry-run` completes on a machine where nothing is installed yet, and aborts
+  when a probe fails, such as an invalid Kanata config.
 - Re-running converges instead of duplicating config.
 - An existing file that collides with a managed file gets copied to
   `~/.local/state/dotfiles/backups/<timestamp>/` and verified before the symlink

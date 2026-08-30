@@ -16,7 +16,17 @@ mantém o segundo monitor como pendência documentada.
    ```
 
 3. Clone este repositório.
-4. Revise o plano sem alterar a máquina:
+4. Instale as duas dependências do próprio bootstrap:
+
+   ```bash
+   ./bootstrap.sh notebook --only 00-preflight
+   ```
+
+   O módulo valida o ambiente Omarchy e a rede, e instala Git e Stow se
+   faltarem. Ele vem antes do dry-run porque o dry-run só consegue validar o
+   que já está instalado.
+
+5. Revise o plano sem alterar a máquina:
 
    ```bash
    ./bootstrap.sh notebook --dry-run
@@ -24,7 +34,7 @@ mantém o segundo monitor como pendência documentada.
    ./bootstrap.sh desktop --dry-run
    ```
 
-5. Execute o bootstrap real para o host correto somente depois de revisar o
+6. Execute o bootstrap real para o host correto somente depois de revisar o
    dry-run:
 
    ```bash
@@ -33,9 +43,40 @@ mantém o segundo monitor como pendência documentada.
    ./bootstrap.sh desktop
    ```
 
+7. Rode o dry-run de novo. Essa é a passada que realmente valida: com tudo
+   instalado, ele lê os arquivos de verdade e não deve imprimir nenhuma linha
+   de mutação.
+
+   ```bash
+   ./bootstrap.sh notebook --dry-run
+   ```
+
 A execução real para duas vezes pedindo senha: o `00-preflight` roda `sudo -v`
 e o `40-shell` roda `chsh` para trocar o shell padrão para o zsh, que pede a
 senha do próprio usuário. O dry-run não pede nenhuma das duas.
+
+### o que o dry-run valida
+
+Aborta a execução, independente do estado da máquina: ambiente que não é
+Omarchy com base Arch, rede indisponível, host ou `--only` desconhecido, entrada
+de pacote malformada, conflito de Stow que é diretório não gerenciado, destino
+que resolve para dentro do pacote versionado, `settings.json` do VS Code que é
+symlink ou JSON inválido, `~/.oh-my-zsh` que existe mas não é repositório Git, e
+config de terminal cujo formato de fonte não bate com o esperado.
+
+Só imprime o plano, sem conferir: nomes de pacote nos repositórios, IDs de
+extensão do VS Code, versões do mise e a troca de shell.
+
+Com a ferramenta presente, duas verificações rodam de verdade sem escrever no
+disco: `stow -n`, que simula o plano de links e falha se o Stow recusaria os
+argumentos, e `kanata --check`, que valida a sintaxe de
+`stow/host-notebook/.config/kanata/config.kbd`. A simulação do Stow é pulada
+quando há conflitos pendentes, já que a execução real os protegeria antes.
+
+Numa máquina recém-instalada, cada ferramenta ausente aparece como
+`ainda não existe` com o módulo que a instala, e o dry-run segue até o fim em
+vez de abortar. Nesse estado ele é mais um plano do que uma validação, o que é o
+motivo da passada final do passo 7.
 
 O bootstrap não oferece troca automática de host. Para trocar um host já
 aplicado, remova primeiro os links da camada antiga com

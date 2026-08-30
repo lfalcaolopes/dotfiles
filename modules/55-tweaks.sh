@@ -16,10 +16,30 @@ kitty="$config_home/kitty/kitty.conf"
 shell_json="$config_home/omarchy/shell.json"
 
 require_command awk
-require_command jq
-for file in "$alacritty" "$foot" "$ghostty" "$kitty" "$shell_json"; do
-  require_file "$file"
+
+jq_available=true
+if ! require_provisioned_command jq "o Omarchy"; then
+  jq_available=false
+fi
+
+# Numa máquina recém-instalada os arquivos abaixo só existem depois que os
+# pacotes e o Stow rodam de verdade, então em dry-run apenas os anotamos.
+present_specifications=()
+for specification in \
+  "alacritty:$alacritty" \
+  "foot:$foot" \
+  "ghostty:$ghostty" \
+  "kitty:$kitty"; do
+  file=${specification#*:}
+  if require_provisioned_file "$file" "o módulo 10-packages"; then
+    present_specifications+=("$specification")
+  fi
 done
+
+shell_json_available=true
+if ! require_provisioned_file "$shell_json" "o Omarchy"; then
+  shell_json_available=false
+fi
 
 render_terminal() {
   local kind=$1 file=$2
@@ -69,23 +89,21 @@ render_terminal() {
   esac
 }
 
-for specification in \
-  "alacritty:$alacritty" \
-  "foot:$foot" \
-  "ghostty:$ghostty" \
-  "kitty:$kitty"; do
+for specification in ${present_specifications[@]+"${present_specifications[@]}"}; do
   kind=${specification%%:*}
   file=${specification#*:}
   render_terminal "$kind" "$file" >/dev/null || die \
     "formato esperado de fonte não encontrado uma única vez em $file"
 done
 
-jq -e '
-  (.idle | type == "object") and
-  (.idle.lock | type == "number") and
-  (.idle.screensaver | type == "number")
-' "$shell_json" >/dev/null || die \
-  "formato esperado de idle não encontrado em $shell_json"
+if [[ $jq_available == true && $shell_json_available == true ]]; then
+  jq -e '
+    (.idle | type == "object") and
+    (.idle.lock | type == "number") and
+    (.idle.screensaver | type == "number")
+  ' "$shell_json" >/dev/null || die \
+    "formato esperado de idle não encontrado em $shell_json"
+fi
 
 if [[ $DRY_RUN == true ]]; then
   log_info "dry-run: ajustar fontes dos quatro terminais para 11"

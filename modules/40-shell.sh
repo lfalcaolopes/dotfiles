@@ -39,7 +39,9 @@ checkout() {
   log_info "$name atualizado"
 }
 
-require_command git
+if ! require_provisioned_command git "o módulo 00-preflight"; then
+  log_info "dry-run: os clones e o git config dependem do Git instalado"
+fi
 checkout oh-my-zsh "$oh_my_zsh_repository" "$oh_my_zsh"
 checkout zsh-autosuggestions \
   "$autosuggestions_repository" \
@@ -53,22 +55,25 @@ run_mutating "configurar nome global do Git" \
 run_mutating "configurar email global do Git" \
   git config --global user.email "lfalcaolopes@gmail.com"
 
-require_command zsh
-zsh_path=$(command -v zsh)
-if [[ -n ${DOTFILES_CURRENT_SHELL:-} ]]; then
-  current_shell=$DOTFILES_CURRENT_SHELL
+if require_provisioned_command zsh "o módulo 10-packages"; then
+  zsh_path=$(command -v zsh)
+  if [[ -n ${DOTFILES_CURRENT_SHELL:-} ]]; then
+    current_shell=$DOTFILES_CURRENT_SHELL
+  else
+    require_command getent
+    require_command id
+    passwd_entry=$(getent passwd "$(id -un)") || die \
+      "não foi possível consultar o shell padrão do usuário atual"
+    current_shell=${passwd_entry##*:}
+  fi
+  if [[ $current_shell != "$zsh_path" ]]; then
+    require_command chsh
+    run_mutating "alterar shell padrão para $zsh_path" chsh -s "$zsh_path"
+  else
+    log_info "shell padrão já é $zsh_path"
+  fi
 else
-  require_command getent
-  require_command id
-  passwd_entry=$(getent passwd "$(id -un)") || die \
-    "não foi possível consultar o shell padrão do usuário atual"
-  current_shell=${passwd_entry##*:}
-fi
-if [[ $current_shell != "$zsh_path" ]]; then
-  require_command chsh
-  run_mutating "alterar shell padrão para $zsh_path" chsh -s "$zsh_path"
-else
-  log_info "shell padrão já é $zsh_path"
+  log_info "dry-run: shell padrão passaria a ser o zsh instalado pelo módulo 10-packages"
 fi
 
 claude_profile="$HOME/.claude-dio"

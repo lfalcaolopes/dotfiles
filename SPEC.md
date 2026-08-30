@@ -148,7 +148,13 @@ Requisitos:
   mutável. Isso inclui `sudo -v`, gerenciadores de pacotes, clones ou pulls,
   `chsh`, `systemctl`, instalação de extensões e `mise use`;
 - em dry-run, validações que exigiriam um comando mutável devem apenas verificar
-  pré-condições por meios somente leitura e informar o que seria executado;
+  pré-condições por meios somente leitura e informar o que seria executado. Modos
+  somente leitura de uma ferramenta são permitidos e usados quando ela está
+  presente: `stow -n` e `kanata --check`;
+- dry-run não pode assumir a máquina já convergida. Uma ferramenta que outro
+  módulo instalaria, ou um arquivo que ele criaria, é registrada como pendência
+  com o módulo responsável, e a execução segue; fora do dry-run a mesma ausência
+  é fatal;
 - propagar falhas com mensagem que identifique o módulo;
 - não assumir que o diretório atual é a raiz do repositório;
 - reexecução deve convergir para o mesmo estado.
@@ -233,6 +239,8 @@ Critérios de aceite:
 - hosts inválidos falham antes de alterar a máquina;
 - dry-run percorre o plano completo sem escrever;
 - dry-run não invoca nenhum comando mutável, comprovado pelo log dos shims;
+- dry-run conclui numa máquina sem stow, zsh, mise, kanata nem code, e aborta
+  quando uma verificação somente leitura reprova;
 - cada valor aceito por `--only` funciona em teste isolado, e nomes com `.sh`
   ou inexistentes são rejeitados antes de qualquer alteração;
 - a suíte usa `HOME` temporário e não altera a estação de trabalho;

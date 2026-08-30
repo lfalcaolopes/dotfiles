@@ -30,6 +30,43 @@ require_file() {
   [[ -f "$1" ]] || die "arquivo obrigatório não encontrado: $1"
 }
 
+# Dependências que outro módulo (ou o próprio preflight) instala antes deste.
+# Em --dry-run numa máquina recém-instalada a ausência é esperada: o plano é
+# registrado e a execução segue, em vez de abortar. Retorna 1 quando a
+# dependência está ausente sob dry-run, para o chamador pular o que dependeria
+# dela; sempre use em um condicional, já que os módulos rodam com set -e.
+require_provisioned_command() {
+  local command_name=$1
+  local provider=${2:-um módulo anterior}
+
+  command_exists "$command_name" && return 0
+
+  if [[ ${DRY_RUN:-false} == true ]]; then
+    log_info "dry-run: $command_name ainda não existe; $provider o instala antes deste módulo"
+    return 1
+  fi
+
+  # Fora do dry-run a ausência é fatal. Módulos rodam como processos próprios,
+  # então encerramos aqui em vez de depender do set -e do chamador.
+  log_error "comando obrigatório não encontrado: $command_name"
+  exit 1
+}
+
+require_provisioned_file() {
+  local file=$1
+  local provider=${2:-um módulo anterior}
+
+  [[ -f "$file" ]] && return 0
+
+  if [[ ${DRY_RUN:-false} == true ]]; then
+    log_info "dry-run: $file ainda não existe; $provider o cria antes deste módulo"
+    return 1
+  fi
+
+  log_error "arquivo obrigatório não encontrado: $file"
+  exit 1
+}
+
 shell_join() {
   local arg quoted
   local -a output=()
@@ -114,11 +151,13 @@ stow_apply_package() {
   local timestamp backup_dir=
   local source relative destination resolved_source resolved_destination escaped_relative
   local resolved_backup_root resolved_stow_dir
-  local character index
+  local character index simulation line
   local -a conflicts=()
   local -a stow_args=(--no-folding --restow --dir "$stow_dir" --target "$target")
 
-  require_command stow
+  if ! require_provisioned_command stow "o módulo 00-preflight"; then
+    log_info "dry-run: planejamento do pacote $package segue sem consultar o Stow"
+  fi
   [[ -d $package_dir ]] || die "pacote Stow não encontrado: $package_dir"
   [[ -d $target ]] || die "destino Stow não encontrado: $target"
 
@@ -189,6 +228,23 @@ stow_apply_package() {
 
   if [[ ${DRY_RUN:-false} == true ]]; then
     log_info "dry-run: aplicar Stow: $(shell_join stow "${stow_args[@]}" "$package")"
+
+    if ! command_exists stow; then
+      return 0
+    fi
+    if (( ${#conflicts[@]} > 0 )); then
+      log_info "dry-run: simulação do Stow pulada; a execução real protegeria os conflitos antes"
+      return 0
+    fi
+
+    # -n não toca no disco: valida os argumentos e o plano de links de verdade.
+    simulation=$(stow -n -v "${stow_args[@]}" "$package" 2>&1) || die \
+      "simulação do Stow falhou para $package: $simulation"
+    if [[ -n $simulation ]]; then
+      while IFS= read -r line; do
+        log_info "dry-run: stow: $line"
+      done <<< "$simulation"
+    fi
     return 0
   fi
 

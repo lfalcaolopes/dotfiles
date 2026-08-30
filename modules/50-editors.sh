@@ -17,7 +17,9 @@ require_file "$settings_source"
 require_file "$extensions_file"
 require_command jq
 require_command python3
-require_command code
+if ! require_provisioned_command code "o módulo 10-packages"; then
+  log_info "dry-run: as extensões só podem ser conferidas com o code instalado"
+fi
 
 [[ ! -L $settings_destination ]] || die \
   "settings do VS Code é symlink; merge recusado: $settings_destination"
