@@ -22,6 +22,9 @@ unit_destination="$unit_dir/kanata.service"
 
 require_command kanata
 require_command systemctl
+require_command cmp
+require_command install
+require_command rm
 require_file "$source_config"
 require_file "$unit_source"
 
@@ -30,7 +33,8 @@ if [[ $DRY_RUN == false ]]; then
 fi
 
 unit_changed=true
-if [[ -f $unit_destination ]] && cmp -s -- "$unit_source" "$unit_destination"; then
+if [[ ! -L $unit_destination && -f $unit_destination ]] && \
+  cmp -s -- "$unit_source" "$unit_destination"; then
   unit_changed=false
 fi
 
@@ -47,6 +51,9 @@ fi
 
 if [[ $unit_changed == true ]]; then
   ensure_dir "$unit_dir"
+  if [[ -L $unit_destination ]]; then
+    rm -- "$unit_destination"
+  fi
   install -m 0644 -- "$unit_source" "$unit_destination"
   systemctl --user daemon-reload
 fi

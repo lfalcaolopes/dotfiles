@@ -66,9 +66,10 @@ fi
 mv -f -- "$merged_json" "$settings_destination"
 
 declare -A installed=()
+installed_output=$(code --list-extensions)
 while IFS= read -r extension || [[ -n $extension ]]; do
   [[ -n $extension ]] && installed["${extension,,}"]=1
-done < <(code --list-extensions)
+done <<< "$installed_output"
 
 while IFS= read -r extension || [[ -n $extension ]]; do
   [[ -z $extension || $extension == \#* ]] && continue
