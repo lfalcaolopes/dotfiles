@@ -1,61 +1,57 @@
 # dotfiles
 
-Bootstrap idempotente para uma instalação limpa do [Omarchy](https://omarchy.org)
-4. Um comando parte do sistema recém instalado e chega à estação configurada,
-sem copiar defaults do Omarchy nem estado de runtime da máquina de origem.
-
-Feito para os meus dois hosts. Serve como referência para quem usa Omarchy e
-quiser a mesma estrutura, mas as preferências dentro dele são minhas.
+Idempotent bootstrap for a fresh [Omarchy](https://omarchy.org) 4 install. One
+command takes a new machine to a configured one. No Omarchy defaults copied, no
+runtime state dragged over from the old box.
 
 ```bash
 git clone https://github.com/lfalcaolopes/dotfiles.git
 cd dotfiles
-./bootstrap.sh notebook --dry-run   # revisar
-./bootstrap.sh notebook             # aplicar
+./bootstrap.sh notebook --dry-run   # review
+./bootstrap.sh notebook             # apply
 ```
 
-O host é argumento obrigatório e não é detectado por hostname: `notebook` tem
-painel interno e Kanata, `desktop` tem dois monitores e nenhum Kanata.
+Host is a required argument, not detected from the hostname. `notebook` has the
+internal panel and Kanata; `desktop` has two monitors and no Kanata.
 
-## como está organizado
+## layout
 
 ```text
-bootstrap.sh          orquestra os módulos na ordem
-modules/              um passo por arquivo, executável isoladamente
-lib/common.sh         logging, Stow com backup, dry-run
-packages/             listas triadas de pacotes e extensões
-config/               arquivos aplicados por cópia ou merge, nunca por link
-stow/common/          configuração portável para qualquer Linux
-stow/omarchy/         overrides do Omarchy
-stow/host-<nome>/     monitor e hardware de um host
-docs/MANUAL.md        os passos que exigem uma pessoa
-SPEC.md               o plano completo e as decisões por trás dele
+bootstrap.sh          runs the modules in order
+modules/              one step per file, each runnable on its own
+lib/common.sh         logging, Stow with backup, dry-run
+packages/             package and extension lists
+config/               applied by copy or merge, never linked
+stow/common/          portable config for any Linux
+stow/omarchy/         Omarchy overrides
+stow/host-<name>/     per-host monitor and hardware
+docs/MANUAL.md        the steps that need a human
+SPEC.md               full plan and the reasoning behind it
 ```
 
-Três garantias que os testes em `tests/run.sh` cobrem, com `HOME` temporário e
-shims no `PATH`, sem tocar na máquina real:
+## what the tests cover
 
-`--dry-run` descreve tudo e não executa um único comando mutável, nem `sudo -v`,
-nem gerenciador de pacotes, nem `chsh`, nem `systemctl`.
+`tests/run.sh` uses a temp `HOME` and `PATH` shims, so it never touches the real
+machine. It checks three things:
 
-Reexecutar converge para o mesmo estado em vez de duplicar configuração.
+- `--dry-run` prints everything and mutates nothing: no `sudo -v`, no package
+  manager, no `chsh`, no `systemctl`.
+- Re-running converges instead of duplicating config.
+- An existing file that collides with a managed file gets copied to
+  `~/.local/state/dotfiles/backups/<timestamp>/` and verified before the symlink
+  replaces it. `stow --adopt` is never used, and a directory with local content
+  aborts the run instead of being swallowed.
 
-Arquivo seu que conflite com um arquivo gerenciado é copiado para
-`~/.local/state/dotfiles/backups/<timestamp>/` e verificado antes de ser
-substituído pelo link. `stow --adopt` nunca é usado, e um diretório com
-conteúdo local aborta a execução em vez de ser absorvido.
+## what is not here
 
-## o que não está aqui
+No secrets, tokens, keys, browser profiles, or history. `~/.ssh`, `~/.gnupg`,
+`hosts.yml`, and credentials are excluded by rule. Files that Omarchy, `gh`,
+`mise`, VS Code, or systemd rewrite on their own are set by command or merge, so
+they never become symlinks.
 
-Nenhum segredo, token, chave, perfil de navegador ou histórico. `~/.ssh`,
-`~/.gnupg`, `hosts.yml` e credenciais ficam fora por regra, não por descuido.
-Arquivos que o Omarchy, o `gh`, o `mise`, o VS Code ou o systemd reescrevem
-sozinhos são configurados por comando ou merge, nunca viram symlink.
-
-Os logins, as chaves pessoais e a instalação do 1Password e do voxtype estão em
+Logins, personal keys, and the 1Password and voxtype installs are in
 [`docs/MANUAL.md`](docs/MANUAL.md).
 
-## licença
+## license
 
-MIT. As preferências pessoais dentro dos arquivos são minhas; a estrutura é sua
-para copiar.
+MIT.
