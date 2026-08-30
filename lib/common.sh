@@ -43,6 +43,7 @@ require_provisioned_command() {
 
   if [[ ${DRY_RUN:-false} == true ]]; then
     log_info "dry-run: $command_name ainda não existe; $provider o instala antes deste módulo"
+    summary_hold "$command_name"
     return 1
   fi
 
@@ -60,11 +61,43 @@ require_provisioned_file() {
 
   if [[ ${DRY_RUN:-false} == true ]]; then
     log_info "dry-run: $file ainda não existe; $provider o cria antes deste módulo"
+    summary_hold "${file##*/}"
     return 1
   fi
 
   log_error "arquivo obrigatório não encontrado: $file"
   exit 1
+}
+
+# O bootstrap agrega estes registros no resumo final do dry-run. Cada linha é
+# módulo, tipo, contagem e mensagem, separados por tabulação. O resumo mostra
+# atenções e pendências linha a linha e usa as mudanças apenas na contagem
+# total; a mensagem de uma mudança fica no arquivo para diagnóstico. Sem
+# DOTFILES_SUMMARY_FILE (módulo executado direto, fora do bootstrap) a função é
+# um no-op.
+summary_record() {
+  local kind=$1 count=$2 message=$3
+  local file=${DOTFILES_SUMMARY_FILE:-}
+
+  [[ -n $file ]] || return 0
+  printf '%s\t%s\t%s\t%s\n' \
+    "${DOTFILES_SUMMARY_MODULE:-desconhecido}" "$kind" "$count" "$message" >> "$file"
+}
+
+# Mudanças que a execução real faria de fato; o módulo já confirmou que o
+# estado atual diverge do desejado.
+summary_change() {
+  summary_record change "$1" "$2"
+}
+
+# Algo que a pessoa precisa conferir antes de aplicar.
+summary_attention() {
+  summary_record attention "$1" "$2"
+}
+
+# Validação que só é possível depois que outro módulo rodar.
+summary_hold() {
+  summary_record hold 1 "$1"
 }
 
 shell_join() {
@@ -152,6 +185,7 @@ stow_apply_package() {
   local source relative destination resolved_source resolved_destination escaped_relative
   local resolved_backup_root resolved_stow_dir
   local character index simulation line
+  local pending_links=0
   local -a conflicts=()
   local -a stow_args=(--no-folding --restow --dir "$stow_dir" --target "$target")
 
@@ -192,6 +226,8 @@ stow_apply_package() {
       [[ ! -d $destination ]] || die \
         "conflito é diretório; conteúdo não gerenciado foi preservado: $destination"
       conflicts+=("$relative")
+    else
+      pending_links=$((pending_links + 1))
     fi
   done < <(find "$package_dir" \( -type f -o -type l \) -print0)
 
@@ -228,6 +264,14 @@ stow_apply_package() {
 
   if [[ ${DRY_RUN:-false} == true ]]; then
     log_info "dry-run: aplicar Stow: $(shell_join stow "${stow_args[@]}" "$package")"
+
+    (( pending_links == 0 )) || summary_change "$pending_links" \
+      "$pending_links link(s) a criar"
+    if (( ${#conflicts[@]} > 0 )); then
+      summary_change "${#conflicts[@]}" "${#conflicts[@]} arquivo(s) a substituir por link"
+      summary_attention "${#conflicts[@]}" \
+        "${#conflicts[@]} conflito(s) seriam movidos para backup"
+    fi
 
     if ! command_exists stow; then
       return 0

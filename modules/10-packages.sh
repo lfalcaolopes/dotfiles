@@ -58,6 +58,23 @@ if [[ $DRY_RUN == true ]]; then
     "instalar pacotes oficiais" sudo pacman -S --needed --noconfirm "${official[@]}"
   (( ${#aur[@]} == 0 )) || run_mutating \
     "instalar pacotes AUR" yay -S --needed --noconfirm "${aur[@]}"
+
+  # pacman -Qq só consulta o banco local: diz o que falta sem tocar em nada.
+  if command_exists pacman; then
+    missing=()
+    for package in "${official[@]}" "${aur[@]}"; do
+      pacman -Qq "$package" >/dev/null 2>&1 || missing+=("$package")
+    done
+
+    if (( ${#missing[@]} > 0 )); then
+      log_info "dry-run: ausentes nesta máquina: ${missing[*]}"
+      summary_change "${#missing[@]}" "${#missing[@]} pacote(s) a instalar"
+    else
+      log_info "todos os pacotes já estão instalados"
+    fi
+  else
+    summary_hold pacman
+  fi
   exit 0
 fi
 

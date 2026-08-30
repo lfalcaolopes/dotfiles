@@ -94,7 +94,71 @@ make_shim curl readonly
   printf '%s\n' 'exit 0'
 } > "$SHIMS/kanata"
 
-chmod +x "$SHIMS/stow" "$SHIMS/kanata"
+# Sondagens somente leitura do dry-run: consultam estado e não são mutação.
+# As variáveis permitem simular uma máquina onde nada está convergido.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if [[ ${1:-} == config && ${2:-} == --global && ${3:-} == --get ]]; then'
+  printf '%s\n' '  case ${4:-} in'
+  printf '%s\n' '    user.name) printf '\''%s\n'\'' "${GIT_NAME_FIXTURE:-}" ;;'
+  printf '%s\n' '    user.email) printf '\''%s\n'\'' "${GIT_EMAIL_FIXTURE:-}" ;;'
+  printf '%s\n' '  esac'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/git"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'case ${1:-} in'
+  printf '%s\n' '  -Q*) exit "${PACMAN_QUERY_STATUS:-0}" ;;'
+  printf '%s\n' 'esac'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/pacman"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'for argument in "$@"; do'
+  printf '%s\n' '  case $argument in'
+  printf '%s\n' '    is-enabled|is-active) exit "${SYSTEMCTL_STATE_STATUS:-0}" ;;'
+  printf '%s\n' '  esac'
+  printf '%s\n' 'done'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/systemctl"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'case ${1:-} in'
+  printf '%s\n' '  --list-extensions) cat "${VSCODE_INSTALLED_FIXTURE:-/dev/null}"; exit 0 ;;'
+  printf '%s\n' 'esac'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/code"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'case ${1:-} in'
+  printf '%s\n' '  ls) printf '\''%s\n'\'' "${MISE_STATE_FIXTURE:-null}"; exit 0 ;;'
+  printf '%s\n' 'esac'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/mise"
+
+chmod +x "$SHIMS/stow" "$SHIMS/kanata" "$SHIMS/pacman" "$SHIMS/systemctl" \
+  "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git"
 
 export SHIM_LOG
 TEST_PATH="$SHIMS:/usr/bin:/bin"
@@ -754,6 +818,7 @@ OUTPUT=$(env \
   DOTFILES_STOW_TARGET="$FRESH_HOME" \
   DOTFILES_OS_RELEASE="$OS_RELEASE" \
   DOTFILES_CURRENT_SHELL=/bin/bash \
+  PACMAN_QUERY_STATUS=1 \
   "$BOOTSTRAP" notebook --dry-run 2>&1)
 STATUS=$?
 set -e
@@ -768,10 +833,130 @@ for planned in \
   assert_contains "$OUTPUT" "$planned" "dry-run em máquina sem stow"
 done
 assert_contains "$OUTPUT" 'bootstrap concluído para notebook' "dry-run em máquina sem stow"
+assert_contains "$OUTPUT" 'atenção antes de aplicar' "dry-run em máquina sem stow"
+assert_contains "$OUTPUT" '5 validações adiadas' "dry-run em máquina sem stow"
+assert_contains "$OUTPUT" 'mudanças planejadas; nada bloqueia' "dry-run em máquina sem stow"
 [[ -z $(find "$FRESH_HOME" -mindepth 1 -print) ]] || \
   fail "dry-run em máquina sem stow escreveu no HOME"
 assert_no_mutation "dry-run em máquina sem stow"
 pass "dry-run planeja em máquina recém-instalada sem stow, zsh, kanata nem mise"
+
+# Máquina totalmente convergida: o dry-run deve dizer que não há nada a fazer.
+# É a passada final do manual, exercitada de ponta a ponta.
+CONVERGED_HOME="$SANDBOX/converged-home"
+mkdir -p \
+  "$CONVERGED_HOME/.config/alacritty" \
+  "$CONVERGED_HOME/.config/foot" \
+  "$CONVERGED_HOME/.config/ghostty" \
+  "$CONVERGED_HOME/.config/kitty" \
+  "$CONVERGED_HOME/.config/omarchy" \
+  "$CONVERGED_HOME/.config/systemd/user" \
+  "$CONVERGED_HOME/.claude-dio" \
+  "$CONVERGED_HOME/.claude"
+
+printf '[font]\nsize = 11\n' > "$CONVERGED_HOME/.config/alacritty/alacritty.toml"
+printf '[main]\nfont=JetBrainsMono Nerd Font:size=11\n' > "$CONVERGED_HOME/.config/foot/foot.ini"
+printf 'font-size = 11\n' > "$CONVERGED_HOME/.config/ghostty/config"
+printf 'font_size 11.0\n' > "$CONVERGED_HOME/.config/kitty/kitty.conf"
+jq -n '{idle:{lock:3600,screensaver:86400},local:true}' > \
+  "$CONVERGED_HOME/.config/omarchy/shell.json"
+
+cp -- "$TEST_ROOT/config/systemd/kanata.service" \
+  "$CONVERGED_HOME/.config/systemd/user/kanata.service"
+
+for checkout in \
+  "$CONVERGED_HOME/.oh-my-zsh" \
+  "$CONVERGED_HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" \
+  "$CONVERGED_HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"; do
+  mkdir -p "$checkout/.git"
+done
+
+: > "$CONVERGED_HOME/.claude/CLAUDE.md"
+ln -sfn -- "$CONVERGED_HOME/.claude/CLAUDE.md" "$CONVERGED_HOME/.claude-dio/CLAUDE.md"
+printf '%s\n' '{' '  "theme": "dark",' '  "model": "opus"' '}' > \
+  "$CONVERGED_HOME/.claude-dio/settings.json"
+
+# Os links que o Stow teria criado, montados sem depender do binário.
+while IFS= read -r -d '' source_file; do
+  package=${source_file#"$TEST_ROOT/stow/"}
+  package=${package%%/*}
+  [[ $package == common || $package == omarchy || $package == host-notebook ]] || continue
+  relative=${source_file#"$TEST_ROOT/stow/$package/"}
+  [[ $relative == .stow-local-ignore ]] && continue
+  mkdir -p "$CONVERGED_HOME/$(dirname -- "$relative")"
+  ln -sfn -- "$source_file" "$CONVERGED_HOME/$relative"
+done < <(find "$TEST_ROOT/stow" \( -type f -o -type l \) -print0)
+
+VSCODE_INSTALLED_FIXTURE="$SANDBOX/vscode-installed.txt"
+/usr/bin/grep -v '^#' "$TEST_ROOT/packages/vscode-extensions.txt" | \
+  /usr/bin/grep -v '^$' > "$VSCODE_INSTALLED_FIXTURE"
+
+mkdir -p "$CONVERGED_HOME/.config/Code/User"
+python3 "$TEST_ROOT/lib/vscode_settings_merge.py" \
+  --managed "$TEST_ROOT/config/vscode/settings.json" \
+  --destination "$CONVERGED_HOME/.config/Code/User/settings.json" \
+  --output "$CONVERGED_HOME/.config/Code/User/settings.json" >/dev/null
+
+reset_log
+converged_before=$(find "$CONVERGED_HOME" -mindepth 1 -printf '%P %y %l\n' | sort)
+set +e
+OUTPUT=$(env \
+  HOME="$CONVERGED_HOME" \
+  XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  PATH="$TEST_PATH" \
+  DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
+  DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
+  DOTFILES_OS_RELEASE="$OS_RELEASE" \
+  DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
+  GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
+  GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
+  MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
+  "$BOOTSTRAP" notebook --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_success "dry-run em máquina convergida"
+assert_contains "$OUTPUT" 'nada a fazer: a máquina já está convergida' \
+  "dry-run em máquina convergida"
+assert_not_contains "$OUTPUT" 'atenção antes de aplicar' "dry-run em máquina convergida"
+converged_after=$(find "$CONVERGED_HOME" -mindepth 1 -printf '%P %y %l\n' | sort)
+[[ $converged_before == "$converged_after" ]] || fail "dry-run alterou o HOME convergido"
+assert_no_mutation "dry-run em máquina convergida"
+pass "dry-run em máquina convergida conclui com nada a fazer"
+
+# Mesmo fixture, com um runtime fora do pino e um arquivo conflitante: o resumo
+# precisa reagir, senão o teste anterior não provaria nada.
+printf 'local zsh\n' > "$CONVERGED_HOME/.zshrc.local-conflict"
+ln -sfn -- "$CONVERGED_HOME/.zshrc.local-conflict" "$SANDBOX/keep-conflict"
+/usr/bin/rm -- "$CONVERGED_HOME/.zshrc"
+printf 'local zsh\n' > "$CONVERGED_HOME/.zshrc"
+
+reset_log
+set +e
+OUTPUT=$(env \
+  HOME="$CONVERGED_HOME" \
+  XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  PATH="$TEST_PATH" \
+  DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
+  DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
+  DOTFILES_OS_RELEASE="$OS_RELEASE" \
+  DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
+  GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
+  GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
+  MISE_STATE_FIXTURE='{"node":[{"requested_version":"25.2.1"}]}' \
+  "$BOOTSTRAP" notebook --dry-run 2>&1)
+STATUS=$?
+set -e
+assert_success "dry-run detecta divergência"
+assert_not_contains "$OUTPUT" 'nada a fazer' "dry-run detecta divergência"
+assert_contains "$OUTPUT" 'atenção antes de aplicar' "dry-run detecta divergência"
+assert_contains "$OUTPUT" '1 conflito(s) seriam movidos para backup' \
+  "dry-run detecta divergência"
+assert_contains "$OUTPUT" '4 mudanças planejadas; nada bloqueia' \
+  "dry-run detecta divergência"
+assert_no_mutation "dry-run detecta divergência"
+pass "dry-run contabiliza conflito e runtimes fora do pino"
 
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"

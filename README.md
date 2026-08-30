@@ -18,8 +18,28 @@ already installed. With Stow present it simulates the symlink plan (`stow -n`)
 instead of just printing the command. Skipping it still works: the dry run
 reports each missing tool as `ainda não existe` and plans the rest.
 
-The last dry run is the real check. It should print no mutation line, which is
-what makes the run idempotent.
+The last dry run is the real check. Every dry run ends with a verdict that only
+speaks up when something needs you:
+
+```text
+  atenção antes de aplicar:
+    30-stow-omarchy  5 conflito(s) seriam movidos para backup
+    55-tweaks        5 validações adiadas: alacritty.toml, foot.ini, ...
+
+  24 mudanças planejadas; nada bloqueia.
+```
+
+On a converged machine it collapses to one line, which is what makes the run
+idempotent:
+
+```text
+  nada a fazer: a máquina já está convergida.
+```
+
+The count is not a tally of commands. Each module probes the current state
+read-only first (`pacman -Qq`, `git config --get`, `systemctl is-active`,
+`code --list-extensions`, `mise ls --global`, byte comparison of the files it
+would rewrite), so it counts only what would actually change.
 
 Host is a required argument, not detected from the hostname. `notebook` has the
 internal panel and Kanata; `desktop` has two monitors and no Kanata.
@@ -49,6 +69,8 @@ machine. It checks:
   `kanata --check`.
 - `--dry-run` completes on a machine where nothing is installed yet, and aborts
   when a probe fails, such as an invalid Kanata config.
+- A fully converged fixture ends with `nada a fazer`, and the same fixture with
+  one runtime off its pin and one conflicting file reports both.
 - Re-running converges instead of duplicating config.
 - An existing file that collides with a managed file gets copied to
   `~/.local/state/dotfiles/backups/<timestamp>/` and verified before the symlink

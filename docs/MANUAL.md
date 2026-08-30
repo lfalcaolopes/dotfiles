@@ -44,16 +44,52 @@ mantém o segundo monitor como pendência documentada.
    ```
 
 7. Rode o dry-run de novo. Essa é a passada que realmente valida: com tudo
-   instalado, ele lê os arquivos de verdade e não deve imprimir nenhuma linha
-   de mutação.
+   instalado, ele lê os arquivos de verdade e deve terminar com uma linha só.
 
    ```bash
    ./bootstrap.sh notebook --dry-run
    ```
 
+   ```text
+     nada a fazer: a máquina já está convergida.
+   ```
+
 A execução real para duas vezes pedindo senha: o `00-preflight` roda `sudo -v`
 e o `40-shell` roda `chsh` para trocar o shell padrão para o zsh, que pede a
 senha do próprio usuário. O dry-run não pede nenhuma das duas.
+
+### resumo final do dry-run
+
+Toda execução com `--dry-run` termina com um veredito. Ele só fala quando há o
+que dizer:
+
+```text
+  atenção antes de aplicar:
+    30-stow-omarchy  5 conflito(s) seriam movidos para backup
+    55-tweaks        5 validações adiadas: alacritty.toml, foot.ini, ...
+
+  24 mudanças planejadas; nada bloqueia.
+```
+
+O bloco `atenção antes de aplicar` lista duas coisas: conflitos, que são
+arquivos seus que iriam para o backup, e validações adiadas, que são checagens
+impossíveis até outro módulo rodar. `nada bloqueia` significa que nenhuma
+verificação reprovou; uma reprovação aborta a execução e não chega no resumo.
+
+A contagem não é o número de comandos que seriam executados. Cada módulo sonda
+o estado atual por meios somente leitura antes de contar: `pacman -Qq`,
+`git config --get`, `systemctl is-enabled`, `code --list-extensions`,
+`mise ls --global --json` e comparação byte a byte dos arquivos que seriam
+reescritos. Só entra na conta o que realmente mudaria.
+
+Numa máquina convergida o resumo vira uma linha:
+
+```text
+  nada a fazer: a máquina já está convergida.
+```
+
+Ler o log inteiro continua sendo opcional; o resumo é a resposta para "posso
+seguir a vida".
 
 ### o que o dry-run valida
 
@@ -74,8 +110,8 @@ argumentos, e `kanata --check`, que valida a sintaxe de
 quando há conflitos pendentes, já que a execução real os protegeria antes.
 
 Numa máquina recém-instalada, cada ferramenta ausente aparece como
-`ainda não existe` com o módulo que a instala, e o dry-run segue até o fim em
-vez de abortar. Nesse estado ele é mais um plano do que uma validação, o que é o
+`ainda não existe` com o módulo que a instala, entra no resumo como validação
+adiada, e o dry-run segue até o fim em vez de abortar. Nesse estado ele é mais um plano do que uma validação, o que é o
 motivo da passada final do passo 7.
 
 O bootstrap não oferece troca automática de host. Para trocar um host já

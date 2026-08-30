@@ -20,6 +20,7 @@ checkout() {
   if [[ ! -e $destination ]]; then
     ensure_dir "$(dirname -- "$destination")"
     run_mutating "clonar $name" git clone --quiet "$url" "$destination"
+    summary_change 1 "clonar $name"
     return
   fi
 
@@ -50,6 +51,23 @@ checkout zsh-syntax-highlighting \
   "$syntax_highlighting_repository" \
   "$zsh_custom/plugins/zsh-syntax-highlighting"
 
+git_identity() {
+  local key=$1 desired=$2 current
+
+  # --get só lê a configuração; nada é escrito.
+  current=$(git config --global --get "$key" 2>/dev/null || true)
+  [[ $current != "$desired" ]] || return 1
+  summary_change 1 "git config $key"
+  return 0
+}
+
+if [[ $DRY_RUN == true ]] && ! command_exists git; then
+  summary_hold git
+else
+  git_identity user.name "Lucas Falcao Lopes" || true
+  git_identity user.email "lfalcaolopes@gmail.com" || true
+fi
+
 run_mutating "configurar nome global do Git" \
   git config --global user.name "Lucas Falcao Lopes"
 run_mutating "configurar email global do Git" \
@@ -68,6 +86,7 @@ if require_provisioned_command zsh "o módulo 10-packages"; then
   fi
   if [[ $current_shell != "$zsh_path" ]]; then
     require_command chsh
+    summary_change 1 "trocar shell padrão para $zsh_path"
     run_mutating "alterar shell padrão para $zsh_path" chsh -s "$zsh_path"
   else
     log_info "shell padrão já é $zsh_path"
@@ -79,6 +98,17 @@ fi
 claude_profile="$HOME/.claude-dio"
 if [[ $DRY_RUN == true ]]; then
   log_info "dry-run: criar perfil Claude secundário em $claude_profile"
+
+  claude_pending=0
+  [[ -d $claude_profile ]] || claude_pending=$((claude_pending + 1))
+  [[ -L $claude_profile/CLAUDE.md && \
+    $(readlink -- "$claude_profile/CLAUDE.md" 2>/dev/null || true) == "$HOME/.claude/CLAUDE.md" ]] || \
+    claude_pending=$((claude_pending + 1))
+  printf '%s\n' '{' '  "theme": "dark",' '  "model": "opus"' '}' | \
+    cmp -s - "$claude_profile/settings.json" 2>/dev/null || \
+    claude_pending=$((claude_pending + 1))
+  (( claude_pending == 0 )) || summary_change "$claude_pending" \
+    "$claude_pending ajuste(s) no perfil Claude secundário"
 else
   ensure_dir "$claude_profile"
   ln -sfn -- "$HOME/.claude/CLAUDE.md" "$claude_profile/CLAUDE.md"

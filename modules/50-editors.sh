@@ -42,10 +42,50 @@ fi
 
 if [[ $DRY_RUN == true ]]; then
   log_info "dry-run: aplicar bloco gerenciado e preservar bloco local em $settings_destination"
+
+  # O merge é montado num temporário fora do HOME só para comparar com o
+  # arquivo atual; o destino não é tocado.
+  preview=$(mktemp)
+  # Caminho absoluto para o temporário interno não passar pelos shims de teste.
+  trap '/usr/bin/rm -f -- "${preview:-}"' EXIT
+  divergences=$(python3 "$REPO_ROOT/lib/vscode_settings_merge.py" \
+    --managed "$settings_source" \
+    --destination "$settings_destination" \
+    --output "$preview") || die \
+    "falha ao montar as preferências do VS Code: $settings_destination"
+
+  if [[ -n $divergences ]]; then
+    while IFS= read -r divergence; do
+      log_info "$divergence"
+    done <<< "$divergences"
+  fi
+
+  if cmp -s -- "$preview" "$settings_destination"; then
+    log_info "settings.json do VS Code já está convergido"
+  else
+    summary_change 1 "reescrever o settings.json do VS Code"
+  fi
+  /usr/bin/rm -f -- "$preview"
+  trap - EXIT
+
+  pending_extensions=0
+  if command_exists code; then
+    declare -A installed=()
+    while IFS= read -r extension || [[ -n $extension ]]; do
+      [[ -n $extension ]] && installed["${extension,,}"]=1
+    done < <(code --list-extensions)
+  fi
+
   while IFS= read -r extension || [[ -n $extension ]]; do
     [[ -z $extension || $extension == \#* ]] && continue
     log_info "dry-run: instalar extensão VS Code se ausente: $extension"
+    if command_exists code && [[ -z ${installed[${extension,,}]+present} ]]; then
+      pending_extensions=$((pending_extensions + 1))
+    fi
   done < "$extensions_file"
+
+  (( pending_extensions == 0 )) || summary_change "$pending_extensions" \
+    "$pending_extensions extensão(ões) do VS Code a instalar"
   exit 0
 fi
 

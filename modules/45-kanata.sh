@@ -56,10 +56,17 @@ if [[ $DRY_RUN == true ]]; then
   if [[ $unit_changed == true ]]; then
     log_info "dry-run: copiar unit Kanata para $unit_destination"
     log_info "dry-run: $(shell_join systemctl --user daemon-reload)"
+    summary_change 1 "instalar a unit kanata.service"
   else
     log_info "unit Kanata já está atualizada"
   fi
+
   log_info "dry-run: garantir kanata.service habilitada e ativa"
+  # is-enabled e is-active apenas consultam o estado do systemd.
+  systemctl --user is-enabled --quiet kanata.service || \
+    summary_change 1 "habilitar kanata.service"
+  systemctl --user is-active --quiet kanata.service || \
+    summary_change 1 "iniciar kanata.service"
   exit 0
 fi
 

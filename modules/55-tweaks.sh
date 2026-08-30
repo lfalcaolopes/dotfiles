@@ -108,6 +108,28 @@ fi
 if [[ $DRY_RUN == true ]]; then
   log_info "dry-run: ajustar fontes dos quatro terminais para 11"
   log_info "dry-run: ajustar idle.lock=3600 e idle.screensaver=86400 em $shell_json"
+
+  # O render já é somente leitura: comparar a saída com o arquivo atual diz se
+  # a execução real mudaria alguma coisa.
+  pending=0
+  for specification in ${present_specifications[@]+"${present_specifications[@]}"}; do
+    kind=${specification%%:*}
+    file=${specification#*:}
+    if ! render_terminal "$kind" "$file" | cmp -s - "$file"; then
+      log_info "dry-run: fonte divergente em $file"
+      pending=$((pending + 1))
+    fi
+  done
+
+  if [[ $jq_available == true && $shell_json_available == true ]]; then
+    if ! jq '.idle.lock = 3600 | .idle.screensaver = 86400' "$shell_json" | \
+      cmp -s - "$shell_json"; then
+      log_info "dry-run: idle divergente em $shell_json"
+      pending=$((pending + 1))
+    fi
+  fi
+
+  (( pending == 0 )) || summary_change "$pending" "$pending arquivo(s) a reescrever"
   exit 0
 fi
 

@@ -35,6 +35,74 @@ discover_modules() {
   shopt -u nullglob
 }
 
+# Agrega o que os módulos registraram e imprime só o que exige atenção. Silêncio
+# aqui significa máquina convergida.
+render_summary() {
+  local file=$1
+  local module kind count message entry
+  local total_changes=0 width=0 label
+  local -a modules=()
+  local -a attention_entries=()
+  local -A hold_count=()
+  local -A hold_tokens=()
+
+  while IFS=$'\t' read -r module kind count message; do
+    [[ -n $module ]] || continue
+    if [[ ! " ${modules[*]-} " == *" $module "* ]]; then
+      modules+=("$module")
+      (( ${#module} <= width )) || width=${#module}
+    fi
+
+    case $kind in
+      change) total_changes=$((total_changes + count)) ;;
+      attention) attention_entries+=("$module	$message") ;;
+      hold)
+        hold_count[$module]=$(( ${hold_count[$module]:-0} + 1 ))
+        if [[ -n ${hold_tokens[$module]:-} ]]; then
+          hold_tokens[$module]+=", $message"
+        else
+          hold_tokens[$module]=$message
+        fi
+        ;;
+    esac
+  done < "$file"
+
+  if (( total_changes == 1 )); then
+    label='1 mudança planejada'
+  elif (( total_changes > 1 )); then
+    label="$total_changes mudanças planejadas"
+  else
+    label='nenhuma mudança planejada'
+  fi
+
+  printf '\n'
+  if (( total_changes == 0 && ${#attention_entries[@]} == 0 && ${#hold_count[@]} == 0 )); then
+    printf '  nada a fazer: a máquina já está convergida.\n'
+    return 0
+  fi
+
+  if (( ${#attention_entries[@]} > 0 || ${#hold_count[@]} > 0 )); then
+    printf '  atenção antes de aplicar:\n'
+    for module in "${modules[@]}"; do
+      for entry in ${attention_entries[@]+"${attention_entries[@]}"}; do
+        [[ ${entry%%	*} == "$module" ]] || continue
+        printf '    %-*s  %s\n' "$width" "$module" "${entry#*	}"
+      done
+
+      case ${hold_count[$module]:-0} in
+        0) ;;
+        1) printf '    %-*s  validação adiada: %s\n' \
+          "$width" "$module" "${hold_tokens[$module]}" ;;
+        *) printf '    %-*s  %s validações adiadas: %s\n' \
+          "$width" "$module" "${hold_count[$module]}" "${hold_tokens[$module]}" ;;
+      esac
+    done
+    printf '\n'
+  fi
+
+  printf '  %s; nada bloqueia.\n' "$label"
+}
+
 join_by_comma() {
   local IFS=', '
   printf '%s' "$*"
@@ -114,10 +182,20 @@ fi
 
 export REPO_ROOT HOST DRY_RUN
 
+SUMMARY_FILE=
+if [[ $DRY_RUN == true ]]; then
+  SUMMARY_FILE=$(mktemp)
+  # Caminho absoluto para o arquivo interno do resumo não passar pelos shims de
+  # teste e ser contabilizado como mutação, como já é feito no 00-preflight.
+  trap '/usr/bin/rm -f -- "${SUMMARY_FILE:-}"' EXIT
+  export DOTFILES_SUMMARY_FILE=$SUMMARY_FILE
+fi
+
 for module_path in "${selected_paths[@]}"; do
   module_name=${module_path##*/}
   module_name=${module_name%.sh}
   log_info "executando módulo: $module_name"
+  export DOTFILES_SUMMARY_MODULE=$module_name
 
   module_args=("$HOST")
   [[ $DRY_RUN == true ]] && module_args+=(--dry-run)
@@ -132,3 +210,7 @@ for module_path in "${selected_paths[@]}"; do
 done
 
 log_info "bootstrap concluído para $HOST"
+
+[[ $DRY_RUN == true ]] && render_summary "$SUMMARY_FILE"
+
+exit 0
