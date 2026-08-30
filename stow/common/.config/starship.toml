@@ -1,0 +1,141 @@
+"$schema" = "https://starship.rs/config-schema.json"
+command_timeout = 200
+palette = "omarchy"
+
+format = """
+[](color_accent1)\
+$os\
+$username\
+[](bg:color_accent2 fg:color_accent1)\
+$directory\
+[](fg:color_accent2 bg:color_accent3)\
+$git_branch\
+$git_status\
+[](fg:color_accent3 bg:color_accent4)\
+$nodejs\
+$python\
+$dotnet\
+[](fg:color_accent4 bg:color_neutral)\
+$docker_context\
+$time\
+[ ](fg:color_neutral)\
+$line_break$character"""
+
+[palettes.omarchy]
+color_on_accent = "black"
+color_on_neutral = "white"
+color_accent1 = "red"
+color_accent2 = "yellow"
+color_accent3 = "cyan"
+color_accent4 = "blue"
+color_neutral = "bright-black"
+color_green = "green"
+color_red = "red"
+color_purple = "purple"
+
+[os]
+disabled = false
+style = "bg:color_accent1 fg:color_on_accent"
+
+[os.symbols]
+Windows = "󰍲"
+Ubuntu = "󰕈"
+SUSE = ""
+Raspbian = "󰐿"
+Mint = "󰣭"
+Macos = "󰀵"
+Manjaro = ""
+Linux = "󰌽"
+Gentoo = "󰣨"
+Fedora = "󰣛"
+Alpine = ""
+Amazon = ""
+Android = ""
+AOSC = ""
+Arch = "󰣇"
+Artix = "󰣇"
+EndeavourOS = ""
+CentOS = ""
+Debian = "󰣚"
+Redhat = "󱄛"
+RedHatEnterprise = "󱄛"
+Pop = ""
+
+[username]
+show_always = true
+style_user = "bg:color_accent1 fg:color_on_accent"
+style_root = "bg:color_accent1 fg:color_on_accent"
+format = "[ $user ]($style)"
+
+[directory]
+style = "fg:color_on_accent bg:color_accent2"
+format = "[ $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[directory.substitutions]
+"Documents" = "󰈙 "
+"Downloads" = " "
+"Music" = "󰝚 "
+"Pictures" = " "
+"Developer" = "󰲋 "
+
+[git_branch]
+symbol = ""
+style = "bg:color_accent3"
+format = "[[ $symbol $branch ](fg:color_on_accent bg:color_accent3)]($style)"
+
+[git_status]
+style = "bg:color_accent3"
+format = "[[($all_status$ahead_behind )](fg:color_on_accent bg:color_accent3)]($style)"
+ahead = "⇡${count} "
+behind = "⇣${count} "
+diverged = "⇕⇡${ahead_count}⇣${behind_count} "
+conflicted = " "
+up_to_date = " "
+untracked = "? "
+modified = " "
+staged = " "
+deleted = " "
+renamed = " "
+stashed = " "
+
+[nodejs]
+symbol = ""
+style = "bg:color_accent4"
+format = "[[ $symbol( $version) ](fg:color_on_accent bg:color_accent4)]($style)"
+
+[python]
+symbol = ""
+style = "bg:color_accent4"
+format = "[[ $symbol( $version) ](fg:color_on_accent bg:color_accent4)]($style)"
+
+[dotnet]
+disabled = false
+heuristic = true
+symbol = ""
+style = "bg:color_accent4"
+format = "[[ $symbol( $tfm) ](fg:color_on_accent bg:color_accent4)]($style)"
+
+[docker_context]
+symbol = ""
+style = "bg:color_neutral"
+format = "[[ $symbol( $context) ](fg:color_on_neutral bg:color_neutral)]($style)"
+
+[time]
+disabled = false
+time_format = "%R"
+style = "bg:color_neutral"
+format = "[[  $time ](fg:color_on_neutral bg:color_neutral)]($style)"
+
+[line_break]
+disabled = false
+
+[character]
+disabled = false
+success_symbol = "[](bold fg:color_green)"
+error_symbol = "[](bold fg:color_red)"
+vimcmd_symbol = "[](bold fg:color_green)"
+vimcmd_replace_one_symbol = "[](bold fg:color_purple)"
+vimcmd_replace_symbol = "[](bold fg:color_purple)"
+vimcmd_visual_symbol = "[](bold fg:color_accent2)"

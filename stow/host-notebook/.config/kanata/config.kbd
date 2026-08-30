@@ -1,0 +1,132 @@
+;; Home row mods for the internal laptop keyboard.
+;; Derived from the ZMK Corne layout at github.com/lfalcaolopes/corne-layout
+;; (config/corne.keymap, default_layer middle row).
+;;
+;; Home row mods plus a Space-held navigation layer. Caps is Escape on the
+;; base layer and remains available as Caps Lock through Space+Caps.
+
+(defcfg
+  ;; Internal laptop keyboard only. i8042 is the PS/2 controller, which is
+  ;; always the built-in keyboard. The ZMK Corne enumerates as a USB/Bluetooth
+  ;; HID device and therefore can never match this path.
+  linux-dev /dev/input/by-path/platform-i8042-serio-0-event-kbd
+
+  ;; Keys outside defsrc pass through untouched.
+  process-unmapped-keys yes
+)
+
+(defvar
+  ;; ZMK: TAPPING_TERM = 300, used by hm_l / hm_r (A S F J L ;)
+  tap-term 300
+
+  ;; ZMK: TAPPING_TERM_FAST = 200, used by hm_shift_l / hm_shift_r (D K)
+  tap-term-fast 200
+
+  ;; ZMK: QUICK_TAP_TERM / quick-tap-ms = 175 on all four HRM behaviors.
+  ;; Re-press within this window repeats the tap instead of holding,
+  ;; which is what makes key repeat work.
+  quick-tap 175
+
+  ;; ZMK: HM_PRIOR_IDLE / require-prior-idle-ms = 150 on all four.
+  ;; A HRM key pressed within this long after another key resolves as tap.
+  prior-idle 150
+)
+
+;; ZMK: hold-trigger-key-positions = <KEYS_R KEYS_T> for the left hand and
+;; <KEYS_L KEYS_T> for the right. defhands is the kanata equivalent: a hold
+;; only commits when the interrupting key belongs to the opposite hand.
+;;
+;; Extended past the Corne's 42 keys to cover the number row and brackets by
+;; physical side, so ctrl+1..9 works from the right-hand mods.
+(defhands
+  (left
+    grv  1    2    3    4    5
+    tab  q    w    e    r    t
+    caps a    s    d    f    g
+    lsft z    x    c    v    b)
+  (right
+    6    7    8    9    0    -    =    bspc
+    y    u    i    o    p    [    ]    \
+    h    j    k    l    ;    '    ret
+    n    m    ,    .    /    rsft))
+
+;; ZMK mods are all left-side keycodes on BOTH hands (LCTRL/LSHFT/LALT/LGUI),
+;; reproduced here exactly rather than "corrected" to right-side mods.
+;;
+;; Shared options on every home row mod:
+;;   (timeout hold)        ZMK flavor = "balanced": hold wins on timeout.
+;;                         kanata defaults this to tap, so it must be explicit.
+;;   (same-hand tap)       Same-hand roll resolves as tap (ZMK positional HRM).
+;;   (unknown-hand tap)    Function row, arrows, nav cluster resolve as tap.
+;;   (neutral-keys spc)    ZMK KEYS_T: thumb keys trigger hold from either hand.
+;;   (neutral hold)
+;;
+;; The -release variant is ZMK's hold-trigger-on-release: the interrupting key
+;; must be pressed AND released before the hold commits.
+(defalias
+  ;; Match the Corne's Nav thumb key: tap Space normally, or hold it for the
+  ;; navigation layer. Plain tap-hold matches ZMK's tap-preferred behavior:
+  ;; the layer activates on timeout, avoiding accidental arrows while typing.
+  spc  (tap-hold $quick-tap $tap-term-fast spc (layer-while-held nav))
+
+  a    (tap-hold-opposite-hand-release $tap-term      a lmet
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  s    (tap-hold-opposite-hand-release $tap-term      s lalt
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  d    (tap-hold-opposite-hand-release $tap-term-fast d lsft
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  f    (tap-hold-opposite-hand-release $tap-term      f lctl
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  j    (tap-hold-opposite-hand-release $tap-term      j lctl
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  k    (tap-hold-opposite-hand-release $tap-term-fast k lsft
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  l    (tap-hold-opposite-hand-release $tap-term      l lalt
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+  semi (tap-hold-opposite-hand-release $tap-term      ; lmet
+         (timeout hold) (same-hand tap) (unknown-hand tap)
+         (neutral-keys spc) (neutral hold)
+         (require-prior-idle $prior-idle) (tap-repress-timeout $quick-tap))
+)
+
+(defsrc
+  grv  1    2    3    4    5    6    7    8    9    0    -    =    bspc
+  tab  q    w    e    r    t    y    u    i    o    p    [    ]    \
+  caps a    s    d    f    g    h    j    k    l    ;    '    ret
+  lsft z    x    c    v    b    n    m    ,    .    /    rsft
+  lctl lmet lalt           spc            ralt rctl
+)
+
+;; G, H and ' stay plain, matching the Corne (they are &kp on the ZMK layout).
+(deflayer base
+  grv  1    2    3    4    5    6    7    8    9    0    -    =    bspc
+  tab  q    w    e    r    t    y    u    i    o    p    [    ]    \
+  esc  @a   @s   @d   @f   g    h    @j   @k   @l   @semi '   ret
+  lsft z    x    c    v    b    n    m    ,    .    /    rsft
+  lctl lmet lalt           @spc           ralt rctl
+)
+
+;; Same Vim-motion arrow positions as the Corne Nav layer. Everything else is
+;; transparent, so existing base-layer behavior (including home row mods) is
+;; preserved while Space is held.
+(deflayer nav
+  _    _    _    _    _    _    _    _    _    _    _    _    _    _
+  _    _    _    _    _    _    _    _    _    _    _    _    _    _
+  caps _    _    _    _    _    left down up   rght _    _    _
+  _    _    _    _    _    _    _    _    _    _    _    _
+  _    _    _                  _              _    _
+)

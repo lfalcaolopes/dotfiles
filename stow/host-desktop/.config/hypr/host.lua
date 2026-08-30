@@ -1,0 +1,2 @@
+-- Pending capture on the desktop: second monitor EDID, mode, and position.
+-- Workspaces 6-10 remain unassigned until those values are validated there.

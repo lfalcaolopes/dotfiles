@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+vault="$HOME/notes"
+info=$(hyprctl activewindow -j 2>/dev/null)
+class=$(jq -r '.class // empty' <<<"$info")
+address=$(jq -r '.address // empty' <<<"$info")
+
+[[ -n $address ]] || exit 0
+hyprctl dispatch "hl.dsp.window.close(\"address:$address\")"
+
+[[ "${class,,}" == obsidian ]] || exit 0
+[[ -d $vault ]] || exit 0
+git -C "$vault" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+
+for _ in {1..50}; do
+  hyprctl clients | /usr/bin/grep -qF "$address" || break
+  sleep 0.2
+done
+sleep 1
+
+git -C "$vault" add -A
+git -C "$vault" diff --cached --quiet && exit 0
+if ! git -C "$vault" commit -q -m "notes: $(date '+%Y-%m-%d %H:%M:%S')"; then
+  notify-send -u critical "Notes" "git commit failed"
+  exit 1
+fi
+git -C "$vault" push -q || notify-send -u critical "Notes" "Committed locally, push failed"
