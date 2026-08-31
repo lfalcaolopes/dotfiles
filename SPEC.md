@@ -94,6 +94,7 @@ dotfiles/
 │   ├── 05-locale.sh
 │   ├── 10-packages.sh
 │   ├── 15-browser.sh
+│   ├── 17-terminal.sh
 │   ├── 20-stow-common.sh
 │   ├── 30-stow-omarchy.sh
 │   ├── 35-stow-host.sh
@@ -178,15 +179,17 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 3. `10-packages.sh`: instalar pacotes comuns e do host.
 4. `15-browser.sh`: instalar o Brave e defini-lo como navegador padrão, pelos
    comandos do próprio Omarchy.
-5. `20-stow-common.sh`: aplicar `stow/common`.
-6. `30-stow-omarchy.sh`: aplicar `stow/omarchy`.
-7. `35-stow-host.sh`: aplicar exatamente `stow/host-<host>`.
-8. `40-shell.sh`: instalar oh-my-zsh/plugins, configurar shell, Git e perfil
+5. `17-terminal.sh`: instalar o ghostty e defini-lo como terminal padrão, pelos
+   comandos do próprio Omarchy.
+6. `20-stow-common.sh`: aplicar `stow/common`.
+7. `30-stow-omarchy.sh`: aplicar `stow/omarchy`.
+8. `35-stow-host.sh`: aplicar exatamente `stow/host-<host>`.
+9. `40-shell.sh`: instalar oh-my-zsh/plugins, configurar shell, Git e perfil
    secundário do Claude.
-9. `45-kanata.sh`: somente no notebook; copiar/habilitar a unit.
-10. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
-11. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
-12. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
+10. `45-kanata.sh`: somente no notebook; copiar/habilitar a unit.
+11. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
+12. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
+13. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
 
 `lib/common.sh` deve concentrar pelo menos logging, detecção de comando,
 criação de diretório e confirmação. Módulos não devem duplicar essa lógica.
@@ -735,7 +738,8 @@ bloqueio de hardware encontrado.
 | VS Code settings | merge atômico | VS Code + módulo |
 | VS Code extensions | comandos `code` | VS Code |
 | terminal font size e idle | edição dirigida | Omarchy + módulo |
-| tema, browser, logins, voxtype | manual | usuário/Omarchy |
+| navegador e terminal padrão | comandos do Omarchy | módulo |
+| tema, logins, voxtype | manual | usuário/Omarchy |
 
 Use esta tabela para decidir onde colocar qualquer configuração nova.
 

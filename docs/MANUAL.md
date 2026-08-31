@@ -74,6 +74,27 @@ passam a abrir no perfil do Brave e pedem login de novo. O
 `omarchy-launch-webapp` reconhece o Brave na lista de navegadores suportados,
 então nenhum atalho quebra.
 
+### terminal padrão
+
+O `17-terminal` instala o ghostty e o define como terminal padrão, chamando
+`omarchy-install-terminal ghostty` e `omarchy-default-terminal ghostty`. Quem
+decide qual terminal abre no `SUPER + RETURN`, no `xdg-terminal-exec` e nos TUIs
+do Omarchy é o primeiro desktop entry de `~/.config/xdg-terminals.list`, e é
+esse arquivo que os dois comandos escrevem.
+
+O instalador do Omarchy pergunta o terminal uma única vez, durante a instalação,
+e numa máquina que aceitou o padrão o resultado é o foot. O Omarchy entrega o
+`~/.config/ghostty/config` de qualquer jeito, então o `55-tweaks` já ajustava a
+fonte de um terminal que nem estava instalado.
+
+O módulo só chama o instalador quando o pacote `ghostty` falta, porque ele copia
+o config padrão quando `~/.config/ghostty` não existe. O passo do padrão é
+separado: trocar o terminal a mão e rodar o bootstrap de novo reverte a troca
+sem reinstalar nada.
+
+Depois da troca o terminal anterior continua instalado e utilizável; só deixa de
+ser o que abre por padrão.
+
 ### teclado us-intl
 
 O `05-locale` converge o teclado para `us` `pc105` `intl` e o console para

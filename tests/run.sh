@@ -196,8 +196,25 @@ make_shim curl readonly
 
 make_shim omarchy-install-browser
 
+# O terminal padrão vem do xdg-terminals.list; sem argumento o comando do
+# Omarchy só o traduz para o nome curto, então o dry-run pode chamá-lo.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if (($# == 0)); then'
+  printf '%s\n' '  printf '\''%s\n'\'' "${OMARCHY_TERMINAL_FIXTURE:-ghostty}"'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/omarchy-default-terminal"
+
+make_shim omarchy-install-terminal
+
 chmod +x "$SHIMS/stow" "$SHIMS/kanata" "$SHIMS/pacman" "$SHIMS/systemctl" \
-  "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git" "$SHIMS/omarchy-default-browser"
+  "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git" "$SHIMS/omarchy-default-browser" \
+  "$SHIMS/omarchy-default-terminal"
 
 export SHIM_LOG
 TEST_PATH="$SHIMS:/usr/bin:/bin"
@@ -283,6 +300,7 @@ all_modules=(
   05-locale
   10-packages
   15-browser
+  17-terminal
   20-stow-common
   30-stow-omarchy
   35-stow-host
@@ -315,6 +333,7 @@ assert_success "dry-run completo"
 'executando módulo: 05-locale'*\
 'executando módulo: 10-packages'*\
 'executando módulo: 15-browser'*\
+'executando módulo: 17-terminal'*\
 'executando módulo: 20-stow-common'*\
 'executando módulo: 30-stow-omarchy'*\
 'executando módulo: 35-stow-host'*\
@@ -1189,6 +1208,108 @@ assert_success "navegador com pacote presente"
 [[ $(<"$BROWSER_LOG") == 'omarchy-default-browser brave' ]] || \
   fail "instalador rodou com o pacote presente: $(<"$BROWSER_LOG")"
 pass "navegador instala, define o padrão e é idempotente nos dois passos"
+
+# Terminal: numa instalação que aceitou o padrão do Omarchy o ghostty não existe
+# e o xdg-terminals.list aponta para o foot, então o módulo precisa planejar os
+# dois passos, aplicá-los e reconhecer o estado convergido depois.
+TERMINAL_SHIMS="$SANDBOX/terminal-shims"
+TERMINAL_STATE="$SANDBOX/terminal-state"
+TERMINAL_LOG="$SANDBOX/terminal.log"
+mkdir -p "$TERMINAL_SHIMS"
+: > "$TERMINAL_LOG"
+
+# O par de shims compartilha um arquivo de estado, e o instalador também grava o
+# padrão, como o omarchy-install-terminal faz com o xdg-terminals.list.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if (($# == 0)); then'
+  printf '%s\n' '  printf "%s\n" "$(<"$TERMINAL_STATE/default")"'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf "omarchy-default-terminal %s\n" "$*" >> "$TERMINAL_LOG"'
+  printf '%s\n' 'printf "%s" "$1" > "$TERMINAL_STATE/default"'
+} > "$TERMINAL_SHIMS/omarchy-default-terminal"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'printf "omarchy-install-terminal %s\n" "$*" >> "$TERMINAL_LOG"'
+  printf '%s\n' 'touch "$TERMINAL_STATE/installed"'
+  printf '%s\n' 'printf "%s" "$1" > "$TERMINAL_STATE/default"'
+} > "$TERMINAL_SHIMS/omarchy-install-terminal"
+
+# pacman -Qq ghostty responde a partir do mesmo estado.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'case ${1:-} in'
+  printf '%s\n' '  -Q*) [[ -e $TERMINAL_STATE/installed ]]; exit $? ;;'
+  printf '%s\n' 'esac'
+  printf '%s\n' 'printf "pacman %s\n" "$*" >> "$TERMINAL_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$TERMINAL_SHIMS/pacman"
+
+chmod +x "$TERMINAL_SHIMS/omarchy-default-terminal" \
+  "$TERMINAL_SHIMS/omarchy-install-terminal" "$TERMINAL_SHIMS/pacman"
+
+run_terminal_module() {
+  set +e
+  OUTPUT=$(env \
+    HOME="$TEST_HOME" \
+    PATH="$TERMINAL_SHIMS:/usr/bin:/bin" \
+    DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+    TERMINAL_STATE="$TERMINAL_STATE" \
+    TERMINAL_LOG="$TERMINAL_LOG" \
+    "$TEST_ROOT/modules/17-terminal.sh" notebook "$@" 2>&1)
+  STATUS=$?
+  set -e
+}
+
+# Instalação limpa: sem ghostty e com o foot como padrão.
+/usr/bin/rm -rf -- "$TERMINAL_STATE"
+mkdir -p "$TERMINAL_STATE"
+printf 'foot' > "$TERMINAL_STATE/default"
+
+run_terminal_module --dry-run
+assert_success "dry-run de terminal divergente"
+assert_contains "$OUTPUT" 'dry-run: omarchy-install-terminal ghostty' \
+  "dry-run de terminal divergente"
+assert_contains "$OUTPUT" "dry-run: terminal padrão é 'foot', esperado 'ghostty'" \
+  "dry-run de terminal divergente"
+[[ $(<"$TERMINAL_STATE/default") == foot ]] || fail "dry-run de terminal trocou o padrão"
+[[ ! -e $TERMINAL_STATE/installed ]] || fail "dry-run de terminal instalou o ghostty"
+[[ ! -s $TERMINAL_LOG ]] || fail "dry-run de terminal chamou o Omarchy: $(<"$TERMINAL_LOG")"
+
+run_terminal_module
+assert_success "aplicação de terminal"
+assert_contains "$OUTPUT" 'terminal convergido: ghostty' "aplicação de terminal"
+[[ $(<"$TERMINAL_LOG") == 'omarchy-install-terminal ghostty' ]] || \
+  fail "comandos de terminal incorretos: $(<"$TERMINAL_LOG")"
+
+: > "$TERMINAL_LOG"
+run_terminal_module
+assert_success "reexecução de terminal"
+assert_contains "$OUTPUT" 'terminal já estava convergido' "reexecução de terminal"
+[[ ! -s $TERMINAL_LOG ]] || fail "reexecução de terminal chamou o Omarchy: $(<"$TERMINAL_LOG")"
+
+run_terminal_module --dry-run
+assert_success "dry-run de terminal convergido"
+assert_contains "$OUTPUT" 'terminal padrão já é ghostty' "dry-run de terminal convergido"
+assert_not_contains "$OUTPUT" 'dry-run: omarchy-' "dry-run de terminal convergido"
+
+# ghostty instalado mas padrão trocado a mão: só o segundo passo roda, para o
+# instalador não copiar o config padrão por cima de novo.
+printf 'foot' > "$TERMINAL_STATE/default"
+: > "$TERMINAL_LOG"
+run_terminal_module
+assert_success "terminal com pacote presente"
+[[ $(<"$TERMINAL_LOG") == 'omarchy-default-terminal ghostty' ]] || \
+  fail "instalador rodou com o pacote presente: $(<"$TERMINAL_LOG")"
+pass "terminal instala, define o padrão e é idempotente nos dois passos"
 
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"
