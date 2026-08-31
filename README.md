@@ -93,7 +93,9 @@ No secrets, tokens, keys, browser profiles, or history. `~/.ssh`, `~/.gnupg`,
 they never become symlinks.
 
 Logins, personal keys, and the 1Password and voxtype installs are in
-[`docs/MANUAL.md`](docs/MANUAL.md).
+[`docs/MANUAL.md`](docs/MANUAL.md). Every run ends by listing the ones a
+read-only probe still finds undone, so the checklist is on screen instead of
+only in the docs.
 
 ## license
 

@@ -309,6 +309,7 @@ all_modules=(
   50-editors
   55-tweaks
   60-mise
+  70-manual
 )
 for selected_module in "${all_modules[@]}"; do
   reset_log
@@ -341,7 +342,8 @@ assert_success "dry-run completo"
 'executando módulo: 45-kanata'*\
 'executando módulo: 50-editors'*\
 'executando módulo: 55-tweaks'*\
-'executando módulo: 60-mise'* ]] || \
+'executando módulo: 60-mise'*\
+'executando módulo: 70-manual'* ]] || \
   fail "ordem do dry-run"
 [[ $home_before == "$home_after" ]] || fail "dry-run alterou HOME temporário"
 assert_no_mutation "dry-run completo"
@@ -1389,6 +1391,55 @@ assert_success "terminal com pacote presente"
 [[ $(<"$TERMINAL_LOG") == 'omarchy-default-terminal ghostty' ]] || \
   fail "instalador rodou com o pacote presente: $(<"$TERMINAL_LOG")"
 pass "terminal instala, define o padrão e é idempotente nos dois passos"
+
+# Passos manuais: o módulo só sonda estado, então a lista final precisa sumir
+# item a item conforme o login, a chave ou o clone aparecem. A sondagem do
+# voxtype consulta o PATH real e por isso não é afirmada aqui.
+reset_log
+PACMAN_QUERY_STATUS=1 run_bootstrap notebook --only 70-manual --dry-run
+assert_success "checklist manual pendente"
+assert_contains "$OUTPUT" 'falta fazer à mão, na ordem:' "checklist manual pendente"
+assert_contains "$OUTPUT" '    2. autenticar o GitHub por SSH' "checklist manual pendente"
+assert_contains "$OUTPUT" '       gh auth login --git-protocol ssh --hostname github.com' \
+  "checklist manual pendente"
+assert_contains "$OUTPUT" '       ssh-keygen -t ed25519' "checklist manual pendente"
+assert_contains "$OUTPUT" 'entrar na Steam' "checklist manual pendente"
+assert_contains "$OUTPUT" "       git clone git@github.com:lfalcaolopes/notes.git $TEST_HOME/notes" \
+  "checklist manual pendente"
+assert_contains "$OUTPUT" '       omarchy-install-service-1password' "checklist manual pendente"
+assert_no_mutation "checklist manual pendente"
+
+mkdir -p "$TEST_HOME/.ssh" "$TEST_HOME/.config/gh" \
+  "$TEST_HOME/.local/share/Steam/config" "$TEST_HOME/notes/.git"
+printf 'ssh-ed25519 AAAA fixture\n' > "$TEST_HOME/.ssh/id_ed25519.pub"
+printf 'github.com:\n    git_protocol: ssh\n' > "$TEST_HOME/.config/gh/hosts.yml"
+printf '"users"\n' > "$TEST_HOME/.local/share/Steam/config/loginusers.vdf"
+
+reset_log
+run_bootstrap notebook --only 70-manual --dry-run
+assert_success "checklist manual resolvido"
+assert_not_contains "$OUTPUT" 'gh auth login' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" 'git_protocol ssh' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" 'ssh-keygen' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" 'entrar na Steam' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" 'git clone' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" '1Password' "checklist manual resolvido"
+# O login do VS Code fica no keyring do sistema: continua lembrado sempre.
+# Passo sem comando sai só com a descrição, e sozinho ele é o item 1.
+assert_contains "$OUTPUT" '    1. entrar no GitHub pelo VS Code' "checklist manual resolvido"
+assert_not_contains "$OUTPUT" '    2. ' "checklist manual resolvido"
+assert_no_mutation "checklist manual resolvido"
+# Autenticado em HTTPS conta como pendência: o login existe, mas o protocolo
+# que o gh usa em clone e push ainda não é o SSH.
+printf 'github.com:\n    git_protocol: https\n' > "$TEST_HOME/.config/gh/hosts.yml"
+reset_log
+run_bootstrap notebook --only 70-manual --dry-run
+assert_success "checklist manual com gh em https"
+assert_contains "$OUTPUT" 'gh config set -h github.com git_protocol ssh' \
+  "checklist manual com gh em https"
+assert_not_contains "$OUTPUT" 'gh auth login' "checklist manual com gh em https"
+printf 'github.com:\n    git_protocol: ssh\n' > "$TEST_HOME/.config/gh/hosts.yml"
+pass "checklist manual lista só o que a sondagem não encontrou"
 
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"

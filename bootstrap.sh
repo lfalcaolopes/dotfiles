@@ -36,8 +36,9 @@ discover_modules() {
 }
 
 # Agrega o que os módulos registraram e imprime só o que exige atenção. Silêncio
-# aqui significa máquina convergida. O modo decide apenas o tempo verbal: em
-# `plan` as linhas descrevem o que o --dry-run faria, em `apply` o que a
+# no veredito significa máquina convergida; a lista final de passos manuais é
+# outra coisa e sobrevive à convergência. O modo decide apenas o tempo verbal:
+# em `plan` as linhas descrevem o que o --dry-run faria, em `apply` o que a
 # execução real fez.
 render_summary() {
   local file=$1
@@ -46,6 +47,7 @@ render_summary() {
   local total_changes=0 width=0 label
   local -a modules=()
   local -a attention_entries=()
+  local -a manual_entries=()
   local -A hold_count=()
   local -A hold_tokens=()
 
@@ -59,6 +61,7 @@ render_summary() {
     case $kind in
       change) total_changes=$((total_changes + count)) ;;
       attention) attention_entries+=("$module	$message") ;;
+      manual) manual_entries+=("$message") ;;
       hold)
         hold_count[$module]=$(( ${hold_count[$module]:-0} + 1 ))
         if [[ -n ${hold_tokens[$module]:-} ]]; then
@@ -95,6 +98,7 @@ render_summary() {
     else
       printf '  nada a fazer: a máquina já está convergida.\n'
     fi
+    render_manual manual_entries
     return 0
   fi
 
@@ -127,6 +131,37 @@ render_summary() {
   else
     printf '  %s; nada bloqueia.\n' "$label"
   fi
+
+  render_manual manual_entries
+}
+
+# O que o bootstrap não automatiza fecha a saída, depois do veredito: o veredito
+# fala do estado convergido pela máquina, esta lista do que ainda depende de uma
+# pessoa. Lista vazia não imprime nada.
+#
+# Cada passo sai numerado, com o comando sozinho na linha seguinte, para ser
+# copiado e colado direto em outro terminal. O recuo não atrapalha: o shell
+# ignora o espaço à esquerda.
+render_manual() {
+  local -n entries=$1
+  local entry description command
+  local index=0
+
+  (( ${#entries[@]} > 0 )) || return 0
+
+  printf '\n  falta fazer à mão, na ordem:\n'
+  for entry in "${entries[@]}"; do
+    index=$((index + 1))
+    # O `read` do laço acima descarta a tabulação final, então um passo sem
+    # comando chega aqui como uma linha só.
+    description=${entry%%	*}
+    command=
+    [[ $entry == *$'\t'* ]] && command=${entry#*	}
+
+    printf '\n    %d. %s\n' "$index" "$description"
+    [[ -n $command ]] || continue
+    printf '       %s\n' "$command"
+  done
 }
 
 join_by_comma() {

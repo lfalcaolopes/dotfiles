@@ -102,7 +102,8 @@ dotfiles/
 │   ├── 45-kanata.sh
 │   ├── 50-editors.sh
 │   ├── 55-tweaks.sh
-│   └── 60-mise.sh
+│   ├── 60-mise.sh
+│   └── 70-manual.sh
 ├── config/
 │   ├── systemd/
 │   │   └── kanata.service
@@ -164,6 +165,11 @@ Requisitos:
   convergida. A contagem só inclui o que o módulo confirmou divergente por
   sondagem somente leitura, feita antes da escrita na execução real, nunca o
   número de comandos executados;
+- depois do veredito, a execução lista os passos manuais que uma sondagem
+  somente leitura não encontrou concluídos. Essa lista é independente da
+  convergência: uma máquina convergida ainda pode ter login pendente. Um item
+  sem sondagem possível, como o login do VS Code guardado no keyring, é marcado
+  como tal no próprio texto e lembrado sempre;
 - propagar falhas com mensagem que identifique o módulo;
 - não assumir que o diretório atual é a raiz do repositório;
 - reexecução deve convergir para o mesmo estado.
@@ -191,6 +197,9 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 11. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
 12. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
 13. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
+14. `70-manual.sh`: sondar, sem escrever nada, os passos que o bootstrap não
+    automatiza (logins, chave SSH, clone do vault, instaladores interativos) e
+    registrar no resumo os que ainda faltam.
 
 `lib/common.sh` deve concentrar pelo menos logging, detecção de comando,
 criação de diretório e confirmação. Módulos não devem duplicar essa lógica.
@@ -203,7 +212,8 @@ Numa instalação nova, a ordem externa ao bootstrap é:
 2. instalar Brave e defini-lo como navegador padrão;
 3. clonar este repositório;
 4. executar `./bootstrap.sh notebook` ou `./bootstrap.sh desktop`;
-5. concluir os passos interativos de `docs/MANUAL.md`.
+5. concluir os passos interativos de `docs/MANUAL.md`, que o `70-manual.sh`
+   lista no fim de cada execução enquanto continuarem pendentes.
 
 ### 4.4 Estratégia de testes
 
@@ -709,17 +719,20 @@ Criar `docs/MANUAL.md` na ordem real de uso:
 
 1. instalar Brave com `omarchy install browser brave` e defini-lo como padrão,
    caso isso não tenha sido feito antes do clone;
-2. autenticar GitHub (`gh`), Slack, Signal, Steam, Docker Hub e navegador;
-3. gerar uma nova chave SSH e registrá-la no GitHub;
+2. gerar uma nova chave SSH;
+3. autenticar o GitHub por SSH (`gh auth login --git-protocol ssh`), que também
+   registra a chave pública, mais Slack, Signal, Steam, Docker Hub e navegador;
 4. importar chave GPG somente se ainda necessária;
 5. instalar 1Password pelo menu do Omarchy;
 6. instalar voxtype com `omarchy-voxtype-install` se ditado for desejado;
-7. copiar VPNs por canal seguro e recriar comandos locais;
-8. definir o tema built-in `hackerman`;
-9. validar monitor, refresh rate e regras de janela;
-10. no desktop, capturar EDID/modo/posição do segundo monitor e finalizar
+7. clonar o vault do Obsidian em `~/notes`, de que o alias `notes` e o
+   autocommit do `hypr-close-window` dependem;
+8. copiar VPNs por canal seguro e recriar comandos locais;
+9. definir o tema built-in `hackerman`;
+10. validar monitor, refresh rate e regras de janela;
+11. no desktop, capturar EDID/modo/posição do segundo monitor e finalizar
     `stow/host-desktop/.config/hypr/host.lua`;
-11. entrar no perfil secundário usando `claude-dio` e `/login`.
+12. entrar no perfil secundário usando `claude-dio` e `/login`.
 
 Documentar que o flag `silent` pode abrir aplicativos em workspaces não visíveis
 quando o notebook estiver com apenas um monitor. Isso é comportamento esperado.
@@ -743,7 +756,7 @@ bloqueio de hardware encontrado.
 | VS Code extensions | comandos `code` | VS Code |
 | terminal font size e idle | edição dirigida | Omarchy + módulo |
 | navegador e terminal padrão | comandos do Omarchy | módulo |
-| tema, logins, voxtype | manual | usuário/Omarchy |
+| tema, logins, voxtype, vault `~/notes` | manual | usuário/Omarchy |
 
 Use esta tabela para decidir onde colocar qualquer configuração nova.
 

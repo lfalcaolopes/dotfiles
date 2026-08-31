@@ -157,6 +157,49 @@ então ela diz o que mudou de fato, não quantos comandos rodaram. Numa máquina
 já convergida a execução real termina com
 `nada a fazer: a máquina já estava convergida.`
 
+Depois do veredito vem a lista do que o bootstrap nunca vai fazer por você:
+
+```text
+  falta fazer à mão, na ordem:
+
+    1. gerar a chave SSH; o gh auth login registra a pública na conta
+       ssh-keygen -t ed25519 -C "$(hostname)"
+
+    2. autenticar o GitHub por SSH
+       gh auth login --git-protocol ssh --hostname github.com
+
+    3. entrar no GitHub pelo VS Code, pelo ícone de conta; fica no keyring e não é verificável daqui
+
+    4. entrar na Steam; o login não é versionado
+       steam
+
+    5. clonar o vault do Obsidian
+       git clone git@github.com:lfalcaolopes/notes.git ~/notes
+
+    6. instalar o ditado
+       omarchy-voxtype-install
+
+    7. instalar o 1Password e a extensão do Chromium
+       omarchy-install-service-1password
+```
+
+Cada passo vem numerado com o comando sozinho na linha de baixo, para copiar e
+colar em outro terminal sem editar; o recuo não atrapalha o shell. Um passo que
+só existe na interface gráfica, como o login do VS Code, aparece sem comando.
+
+O módulo `70-manual` monta essa lista com sondagens somente leitura:
+`~/.config/gh/hosts.yml` para o `gh`, incluindo o `git_protocol` gravado ali,
+uma chave pública em `~/.ssh`, o
+`loginusers.vdf` da Steam, `~/notes/.git` para o vault, o `voxtype` no PATH e o
+`1password` no `pacman -Qq`. Cada item some sozinho na execução seguinte assim
+que o passo é feito. O login do GitHub dentro do VS Code fica no keyring do
+sistema e não é legível daqui, então continua listado sempre, marcado como não
+verificável.
+
+A lista é independente do veredito: uma máquina já convergida pode terminar com
+`nada a fazer` e ainda assim mostrar logins pendentes. As seções abaixo detalham
+cada passo.
+
 Ler o log inteiro continua sendo opcional; o resumo é a resposta para "posso
 seguir a vida".
 
@@ -243,7 +286,12 @@ alvo do link.
 
 Conclua os logins que não podem ser automatizados:
 
-- GitHub, com `gh auth login`;
+- GitHub, com `gh auth login --git-protocol ssh --hostname github.com`, depois
+  de gerar a chave da seção 3; o `gh` se oferece para registrar a pública na
+  conta. O protocolo é SSH em toda máquina nova, então `git clone`, `push` e
+  `gh repo clone` não pedem token. Numa máquina que já entrou por HTTPS,
+  `gh config set -h github.com git_protocol ssh` corrige sem refazer o login;
+- GitHub dentro do VS Code, pelo ícone de conta; o token vai para o keyring;
 - Slack, Signal, Steam, Docker Hub e o perfil do navegador;
 - perfil secundário do Claude, com `claude-dio` e depois `/login`.
 
@@ -253,7 +301,12 @@ arquivos de credenciais do Claude.
 ## 3. criar chaves pessoais
 
 Gere uma chave SSH nova na máquina e registre a chave pública no GitHub. Não
-copie `~/.ssh` da instalação anterior para o repositório.
+copie `~/.ssh` da instalação anterior para o repositório. Gere a chave antes do
+`gh auth login`: com ela no lugar, o login por SSH registra a pública sozinho.
+
+```bash
+ssh-keygen -t ed25519 -C "$(hostname)"
+```
 
 Importe uma chave GPG por canal seguro somente se a assinatura ou a
 descriptografia com a identidade antiga ainda for necessária. Chaves SSH e GPG
@@ -268,10 +321,18 @@ continuam fora dos dotfiles.
    omarchy-voxtype-install
    ```
 
-3. Transfira arquivos VPN por um canal seguro e recrie aliases ou comandos
+3. Clone o vault do Obsidian em `~/notes`:
+
+   ```bash
+   git clone git@github.com:lfalcaolopes/notes.git ~/notes
+   ```
+
+   O alias `notes` e o autocommit do `hypr-close-window` dependem desse
+   diretório ser um repositório Git; sem ele o script sai sem fazer nada.
+4. Transfira arquivos VPN por um canal seguro e recrie aliases ou comandos
    locais fora deste repositório. Arquivos `.ovpn` e credenciais não são
    versionados.
-4. Aplique o tema built-in:
+5. Aplique o tema built-in:
 
    ```bash
    omarchy theme set hackerman

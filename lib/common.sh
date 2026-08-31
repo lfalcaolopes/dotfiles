@@ -103,6 +103,19 @@ summary_hold() {
   summary_record hold 1 "$1"
 }
 
+# Passo que o bootstrap nunca vai executar: login, chave pessoal ou instalação
+# interativa. O resumo lista estes itens no fim das duas execuções, depois do
+# veredito, enquanto a sondagem do módulo disser que falta.
+#
+# O segundo argumento é a linha de comando pronta para copiar e colar em outro
+# terminal, e é opcional: um passo que só existe na interface gráfica passa
+# apenas a descrição. A tabulação separa os dois campos dentro da mensagem, e o
+# resumo é quem os formata.
+summary_manual() {
+  local description=$1 command=${2:-}
+  summary_record manual 1 "$description	$command"
+}
+
 shell_join() {
   local arg quoted
   local -a output=()
