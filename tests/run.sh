@@ -132,6 +132,7 @@ make_shim curl readonly
   printf '%s\n' '  case ${4:-} in'
   printf '%s\n' '    user.name) printf '\''%s\n'\'' "${GIT_NAME_FIXTURE:-}" ;;'
   printf '%s\n' '    user.email) printf '\''%s\n'\'' "${GIT_EMAIL_FIXTURE:-}" ;;'
+  printf '%s\n' '    url.git@github.com:.pushInsteadOf) printf '\''%s\n'\'' "${GIT_PUSH_REWRITE_FIXTURE:-}" ;;'
   printf '%s\n' '  esac'
   printf '%s\n' '  exit 0'
   printf '%s\n' 'fi'
@@ -1119,6 +1120,7 @@ OUTPUT=$(env \
   DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
   GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  GIT_PUSH_REWRITE_FIXTURE='https://github.com/' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
   SYSTEMCTL_TIMESTAMP_FIXTURE='Fri 2099-01-01 00:00:00 +0000' \
@@ -1151,6 +1153,7 @@ OUTPUT=$(env \
   DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
   GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  GIT_PUSH_REWRITE_FIXTURE='https://github.com/' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
   SYSTEMCTL_TIMESTAMP_FIXTURE='Fri 2099-01-01 00:00:00 +0000' \
@@ -1185,6 +1188,7 @@ OUTPUT=$(env \
   DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
   GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  GIT_PUSH_REWRITE_FIXTURE='https://github.com/' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"25.2.1"}]}' \
   "$BOOTSTRAP" notebook --dry-run 2>&1)
@@ -1218,6 +1222,7 @@ OUTPUT=$(env \
   DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
   GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  GIT_PUSH_REWRITE_FIXTURE='https://github.com/' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"25.2.1"}]}' \
   "$BOOTSTRAP" notebook 2>&1)

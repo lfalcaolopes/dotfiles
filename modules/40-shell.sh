@@ -69,17 +69,32 @@ git_identity() {
   return 0
 }
 
+# Empurra por SSH mesmo com remote HTTPS. O `git_protocol: ssh` do gh só vale
+# para `gh repo clone` e afins; um `git push` contra o remote HTTPS que o README
+# manda clonar continua pedindo usuário e senha, e falha sem askpass.
+#
+# É pushInsteadOf, e não insteadOf. O insteadOf reescreveria também os clones
+# HTTPS anônimos logo acima (oh-my-zsh e os dois plugins), que passariam a exigir
+# a chave registrada no GitHub; este módulo roda muito antes do 70-manual, então
+# numa máquina recém-instalada isso quebraria o bootstrap justamente no caso que
+# a reescrita existe para resolver. Só o push precisa de credencial.
+readonly GITHUB_PUSH_REWRITE='url.git@github.com:.pushInsteadOf'
+readonly GITHUB_HTTPS='https://github.com/'
+
 if [[ $DRY_RUN == true ]] && ! command_exists git; then
   summary_hold git
 else
   git_identity user.name "Lucas Falcao Lopes" || true
   git_identity user.email "lfalcaolopes@gmail.com" || true
+  git_identity "$GITHUB_PUSH_REWRITE" "$GITHUB_HTTPS" || true
 fi
 
 run_mutating "configurar nome global do Git" \
   git config --global user.name "Lucas Falcao Lopes"
 run_mutating "configurar email global do Git" \
   git config --global user.email "lfalcaolopes@gmail.com"
+run_mutating "reescrever push HTTPS do GitHub para SSH" \
+  git config --global "$GITHUB_PUSH_REWRITE" "$GITHUB_HTTPS"
 
 if require_provisioned_command zsh "o módulo 10-packages"; then
   zsh_path=$(command -v zsh)
