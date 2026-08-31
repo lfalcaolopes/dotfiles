@@ -7,16 +7,8 @@ mantém o segundo monitor como pendência documentada.
 ## 1. preparar a máquina
 
 1. Conclua a instalação limpa do Omarchy.
-2. Instale o Brave e defina-o como navegador padrão antes de clonar, se isso
-   ainda não foi feito:
-
-   ```bash
-   omarchy install browser brave
-   xdg-settings set default-web-browser brave-browser.desktop
-   ```
-
-3. Clone este repositório.
-4. Instale as duas dependências do próprio bootstrap:
+2. Clone este repositório.
+3. Instale as duas dependências do próprio bootstrap:
 
    ```bash
    ./bootstrap.sh notebook --only 00-preflight
@@ -26,7 +18,7 @@ mantém o segundo monitor como pendência documentada.
    faltarem. Ele vem antes do dry-run porque o dry-run só consegue validar o
    que já está instalado.
 
-5. Revise o plano sem alterar a máquina:
+4. Revise o plano sem alterar a máquina:
 
    ```bash
    ./bootstrap.sh notebook --dry-run
@@ -34,7 +26,7 @@ mantém o segundo monitor como pendência documentada.
    ./bootstrap.sh desktop --dry-run
    ```
 
-6. Execute o bootstrap real para o host correto somente depois de revisar o
+5. Execute o bootstrap real para o host correto somente depois de revisar o
    dry-run:
 
    ```bash
@@ -43,7 +35,7 @@ mantém o segundo monitor como pendência documentada.
    ./bootstrap.sh desktop
    ```
 
-7. Rode o dry-run de novo. Essa é a passada que realmente valida: com tudo
+6. Rode o dry-run de novo. Essa é a passada que realmente valida: com tudo
    instalado, ele lê os arquivos de verdade e deve terminar com uma linha só.
 
    ```bash
@@ -58,6 +50,29 @@ A execução real para duas vezes pedindo senha: o `00-preflight` roda `sudo -v`
 e o `40-shell` roda `chsh` para trocar o shell padrão para o zsh, que pede a
 senha do próprio usuário. O dry-run não pede nenhuma das duas. O `05-locale`
 também usa `sudo`, mas reaproveita o timestamp deixado pelo preflight.
+
+### navegador padrão
+
+O `15-browser` instala o Brave e o define como navegador padrão, chamando
+`omarchy-install-browser brave` e `omarchy-default-browser brave`. O instalador
+do Omarchy faz mais do que um `yay -S brave-bin`: ele cria o diretório de
+políticas em `/etc/brave/policies/managed`, copia o `chromium-flags.conf` para
+`~/.config/brave-flags.conf` e aplica o tema atual do Omarchy.
+
+O instalador do Omarchy pergunta o navegador uma única vez, durante a
+instalação, e numa máquina que aceitou o padrão o resultado é o Chromium. O
+`.zshrc` do repositório já exporta `BROWSER=brave`, então sem este módulo a
+variável aponta para um binário que não existe.
+
+O módulo só chama o instalador quando `brave-bin` falta, porque ele copia o
+`brave-flags.conf` por cima a cada execução e apagaria ajustes locais. O passo
+do padrão é separado: trocar o navegador a mão e rodar o bootstrap de novo
+reverte a troca sem reinstalar nada.
+
+Depois da troca os webapps do Omarchy (Discord, WhatsApp, YouTube e os demais)
+passam a abrir no perfil do Brave e pedem login de novo. O
+`omarchy-launch-webapp` reconhece o Brave na lista de navegadores suportados,
+então nenhum atalho quebra.
 
 ### teclado us-intl
 

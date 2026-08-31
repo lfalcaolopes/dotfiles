@@ -179,8 +179,25 @@ make_shim curl readonly
   printf '%s\n' 'exit 0'
 } > "$SHIMS/mise"
 
+# Sem argumento o comando do Omarchy só traduz o mimeapps.list para o nome
+# curto: leitura pura, que o dry-run pode chamar sem contar como mutação. Com
+# argumento ele grava o padrão e por isso é registrado.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if (($# == 0)); then'
+  printf '%s\n' '  printf '\''%s\n'\'' "${OMARCHY_BROWSER_FIXTURE:-brave}"'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/omarchy-default-browser"
+
+make_shim omarchy-install-browser
+
 chmod +x "$SHIMS/stow" "$SHIMS/kanata" "$SHIMS/pacman" "$SHIMS/systemctl" \
-  "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git"
+  "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git" "$SHIMS/omarchy-default-browser"
 
 export SHIM_LOG
 TEST_PATH="$SHIMS:/usr/bin:/bin"
@@ -265,6 +282,7 @@ all_modules=(
   00-preflight
   05-locale
   10-packages
+  15-browser
   20-stow-common
   30-stow-omarchy
   35-stow-host
@@ -296,6 +314,7 @@ assert_success "dry-run completo"
   *'executando módulo: 00-preflight'*\
 'executando módulo: 05-locale'*\
 'executando módulo: 10-packages'*\
+'executando módulo: 15-browser'*\
 'executando módulo: 20-stow-common'*\
 'executando módulo: 30-stow-omarchy'*\
 'executando módulo: 35-stow-host'*\
@@ -1069,6 +1088,107 @@ assert_contains "$OUTPUT" '4 mudanças planejadas; nada bloqueia' \
   "dry-run detecta divergência"
 assert_no_mutation "dry-run detecta divergência"
 pass "dry-run contabiliza conflito e runtimes fora do pino"
+
+# Navegador: numa instalação limpa que aceitou o padrão do Omarchy o Brave não
+# existe e o padrão é o Chromium, então o módulo precisa planejar os dois passos,
+# aplicá-los e reconhecer o estado convergido depois.
+BROWSER_SHIMS="$SANDBOX/browser-shims"
+BROWSER_STATE="$SANDBOX/browser-state"
+BROWSER_LOG="$SANDBOX/browser.log"
+mkdir -p "$BROWSER_SHIMS"
+: > "$BROWSER_LOG"
+
+# O par de shims compartilha um arquivo de estado, para o teste cobrir também a
+# reverificação que o módulo faz depois de aplicar.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if (($# == 0)); then'
+  printf '%s\n' '  printf "%s\n" "$(<"$BROWSER_STATE/default")"'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf "omarchy-default-browser %s\n" "$*" >> "$BROWSER_LOG"'
+  printf '%s\n' 'printf "%s" "$1" > "$BROWSER_STATE/default"'
+} > "$BROWSER_SHIMS/omarchy-default-browser"
+
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'printf "omarchy-install-browser %s\n" "$*" >> "$BROWSER_LOG"'
+  printf '%s\n' 'touch "$BROWSER_STATE/installed"'
+} > "$BROWSER_SHIMS/omarchy-install-browser"
+
+# pacman -Qq brave-bin responde a partir do mesmo estado.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'case ${1:-} in'
+  printf '%s\n' '  -Q*) [[ -e $BROWSER_STATE/installed ]]; exit $? ;;'
+  printf '%s\n' 'esac'
+  printf '%s\n' 'printf "pacman %s\n" "$*" >> "$BROWSER_LOG"'
+  printf '%s\n' 'exit 0'
+} > "$BROWSER_SHIMS/pacman"
+
+chmod +x "$BROWSER_SHIMS/omarchy-default-browser" \
+  "$BROWSER_SHIMS/omarchy-install-browser" "$BROWSER_SHIMS/pacman"
+
+run_browser_module() {
+  set +e
+  OUTPUT=$(env \
+    HOME="$TEST_HOME" \
+    PATH="$BROWSER_SHIMS:/usr/bin:/bin" \
+    DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+    BROWSER_STATE="$BROWSER_STATE" \
+    BROWSER_LOG="$BROWSER_LOG" \
+    "$TEST_ROOT/modules/15-browser.sh" notebook "$@" 2>&1)
+  STATUS=$?
+  set -e
+}
+
+# Instalação limpa: sem Brave e com o Chromium como padrão.
+/usr/bin/rm -rf -- "$BROWSER_STATE"
+mkdir -p "$BROWSER_STATE"
+printf 'chromium' > "$BROWSER_STATE/default"
+
+run_browser_module --dry-run
+assert_success "dry-run de navegador divergente"
+assert_contains "$OUTPUT" 'dry-run: omarchy-install-browser brave' \
+  "dry-run de navegador divergente"
+assert_contains "$OUTPUT" "dry-run: navegador padrão é 'chromium', esperado 'brave'" \
+  "dry-run de navegador divergente"
+[[ $(<"$BROWSER_STATE/default") == chromium ]] || fail "dry-run de navegador trocou o padrão"
+[[ ! -e $BROWSER_STATE/installed ]] || fail "dry-run de navegador instalou o Brave"
+[[ ! -s $BROWSER_LOG ]] || fail "dry-run de navegador chamou o Omarchy: $(<"$BROWSER_LOG")"
+
+run_browser_module
+assert_success "aplicação de navegador"
+assert_contains "$OUTPUT" 'navegador convergido: brave' "aplicação de navegador"
+[[ $(<"$BROWSER_LOG") == $'omarchy-install-browser brave\nomarchy-default-browser brave' ]] || \
+  fail "comandos de navegador incorretos: $(<"$BROWSER_LOG")"
+
+: > "$BROWSER_LOG"
+run_browser_module
+assert_success "reexecução de navegador"
+assert_contains "$OUTPUT" 'navegador já estava convergido' "reexecução de navegador"
+[[ ! -s $BROWSER_LOG ]] || fail "reexecução de navegador chamou o Omarchy: $(<"$BROWSER_LOG")"
+
+run_browser_module --dry-run
+assert_success "dry-run de navegador convergido"
+assert_contains "$OUTPUT" 'navegador padrão já é brave' "dry-run de navegador convergido"
+assert_not_contains "$OUTPUT" 'dry-run: omarchy-' "dry-run de navegador convergido"
+
+# Brave instalado mas padrão trocado a mão: só o segundo passo roda, para o
+# instalador não sobrescrever o brave-flags.conf de novo.
+printf 'chromium' > "$BROWSER_STATE/default"
+: > "$BROWSER_LOG"
+run_browser_module
+assert_success "navegador com pacote presente"
+[[ $(<"$BROWSER_LOG") == 'omarchy-default-browser brave' ]] || \
+  fail "instalador rodou com o pacote presente: $(<"$BROWSER_LOG")"
+pass "navegador instala, define o padrão e é idempotente nos dois passos"
 
 for script in "$TEST_ROOT/bootstrap.sh" "$TEST_ROOT/lib/common.sh" "$TEST_ROOT/modules/"*.sh; do
   bash -n "$script"
