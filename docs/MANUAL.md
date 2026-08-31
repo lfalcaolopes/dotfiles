@@ -56,7 +56,22 @@ mantém o segundo monitor como pendência documentada.
 
 A execução real para duas vezes pedindo senha: o `00-preflight` roda `sudo -v`
 e o `40-shell` roda `chsh` para trocar o shell padrão para o zsh, que pede a
-senha do próprio usuário. O dry-run não pede nenhuma das duas.
+senha do próprio usuário. O dry-run não pede nenhuma das duas. O `05-locale`
+também usa `sudo`, mas reaproveita o timestamp deixado pelo preflight.
+
+### teclado us-intl
+
+O `05-locale` converge o teclado para `us` `pc105` `intl` e o console para
+`us-acentos`, com `localectl`. O instalador do Omarchy grava o layout escolhido
+durante a instalação e nunca mais o revisita: numa máquina instalada com `us`
+puro as teclas mortas de acento não existem, e nada no restante do bootstrap
+corrigiria isso.
+
+O `input.lua` padrão do Omarchy lê `XKBLAYOUT` e `XKBVARIANT` de
+`/etc/vconsole.conf` quando interpreta a config, então uma sessão já aberta
+assume o layout novo com `hyprctl reload`. O `localectl` também reescreve
+`/etc/X11/xorg.conf.d/00-keyboard.conf`, e o módulo só considera convergido
+quando os dois arquivos batem.
 
 ### resumo final do dry-run
 
@@ -252,6 +267,8 @@ Confirme os seguintes pontos:
 - Brave, Code, DBeaver, Postman, Steam e WhatsApp nos workspaces definidos;
 - classe real do DBeaver. A regra atual usa `^([dD][bB]eaver)$`, inferida de
   `StartupWMClass`, e precisa ser confirmada em `hyprctl clients`;
+- layout us-intl ativo: `hyprctl getoption input:kb_variant` responde `intl` e
+  `'` seguido de `a` produz `á`;
 - no notebook, `systemctl --user status kanata.service` e o comportamento
   físico das teclas: Caps toca Escape e, mantido, abre a camada de navegação
   com as setas em `hjkl`; Caps+Space aplica Caps Lock; Space não ativa camada

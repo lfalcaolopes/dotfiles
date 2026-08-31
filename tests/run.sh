@@ -37,6 +37,28 @@ printf '{"idle":{"lock":300,"screensaver":600},"local":true}\n' > \
 printf '(defcfg process-unmapped-keys yes)\n' > \
   "$STOW_FIXTURE/host-notebook/.config/kanata/config.kbd"
 
+# O layout de teclado vem do estado do systemd, não do HOME. As fixtures abaixo
+# ficam convergidas e são exportadas para todas as execuções do bootstrap, para
+# o resultado dos testes não depender do teclado da máquina que os roda.
+VCONSOLE_FIXTURE="$SANDBOX/vconsole.conf"
+X11_KEYMAP_FIXTURE="$SANDBOX/00-keyboard.conf"
+printf '%s\n' \
+  'KEYMAP=us-acentos' \
+  'XKBLAYOUT=us' \
+  'XKBMODEL=pc105' \
+  'XKBVARIANT=intl' > "$VCONSOLE_FIXTURE"
+printf '%s\n' \
+  'Section "InputClass"' \
+  '        Identifier "system-keyboard"' \
+  '        MatchIsKeyboard "on"' \
+  '        Option "XkbLayout" "us"' \
+  '        Option "XkbModel" "pc105"' \
+  '        Option "XkbVariant" "intl"' \
+  'EndSection' > "$X11_KEYMAP_FIXTURE"
+DOTFILES_VCONSOLE="$VCONSOLE_FIXTURE"
+DOTFILES_X11_KEYMAP="$X11_KEYMAP_FIXTURE"
+export DOTFILES_VCONSOLE DOTFILES_X11_KEYMAP
+
 printf '%s\n' \
   'NAME="Omarchy"' \
   'ID=omarchy' \
@@ -59,7 +81,7 @@ make_shim() {
   chmod +x "$path"
 }
 
-for command in sudo pacman yay git stow chsh systemctl code mise mkdir cp mv rm ln install kanata zsh; do
+for command in sudo pacman yay git stow chsh systemctl code mise mkdir cp mv rm ln install kanata zsh localectl; do
   make_shim "$command"
 done
 make_shim curl readonly
@@ -241,6 +263,7 @@ pass "--only rejeita extensão .sh e módulo inexistente"
 
 all_modules=(
   00-preflight
+  05-locale
   10-packages
   20-stow-common
   30-stow-omarchy
@@ -271,6 +294,7 @@ home_after=$(find "$TEST_HOME" -mindepth 1 -print | sort)
 assert_success "dry-run completo"
 [[ $OUTPUT == \
   *'executando módulo: 00-preflight'*\
+'executando módulo: 05-locale'*\
 'executando módulo: 10-packages'*\
 'executando módulo: 20-stow-common'*\
 'executando módulo: 30-stow-omarchy'*\
@@ -788,6 +812,94 @@ assert_success "linhas mise"
 [[ $(<"$SHIM_LOG") == $'mise use -g node@24\nmise use -g pnpm@12\nmise use -g dotnet@10' ]] || \
   fail "comandos mise incorretos: $(<"$SHIM_LOG")"
 pass "mise fixa exatamente Node 24, pnpm 12 e .NET SDK 10"
+
+# Teclado: numa máquina instalada com `us` puro o módulo precisa planejar os
+# dois comandos, aplicá-los e reconhecer o estado já convergido depois.
+LOCALE_SHIMS="$SANDBOX/locale-shims"
+LOCALE_VCONSOLE="$SANDBOX/locale-vconsole.conf"
+LOCALE_X11="$SANDBOX/locale-00-keyboard.conf"
+LOCALE_LOG="$SANDBOX/locale.log"
+mkdir -p "$LOCALE_SHIMS"
+: > "$LOCALE_LOG"
+
+printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail' 'exec "$@"' > "$LOCALE_SHIMS/sudo"
+
+# O shim registra a chamada e escreve o que o systemd-localed escreveria, para o
+# teste cobrir também a reverificação que o módulo faz depois de aplicar.
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  # The generated shim expands these variables when it runs.
+  # shellcheck disable=SC2016
+  printf '%s\n' \
+    'printf "localectl %s\n" "$*" >> "$LOCALE_LOG"' \
+    'case ${1:-} in' \
+    '  set-x11-keymap)' \
+    '    printf "XKBLAYOUT=%s\nXKBMODEL=%s\nXKBVARIANT=%s\n" "$2" "$3" "$4" >> "$DOTFILES_VCONSOLE"' \
+    '    printf "Section \"InputClass\"\n        Option \"XkbLayout\" \"%s\"\n        Option \"XkbModel\" \"%s\"\n        Option \"XkbVariant\" \"%s\"\nEndSection\n" \' \
+    '      "$2" "$3" "$4" > "$DOTFILES_X11_KEYMAP"' \
+    '    ;;' \
+    '  set-keymap) printf "KEYMAP=%s\n" "$2" >> "$DOTFILES_VCONSOLE" ;;' \
+    '  *) exit 64 ;;' \
+    'esac'
+} > "$LOCALE_SHIMS/localectl"
+chmod +x "$LOCALE_SHIMS/sudo" "$LOCALE_SHIMS/localectl"
+
+run_locale_module() {
+  set +e
+  OUTPUT=$(env \
+    HOME="$TEST_HOME" \
+    PATH="$LOCALE_SHIMS:/usr/bin:/bin" \
+    DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+    DOTFILES_VCONSOLE="$LOCALE_VCONSOLE" \
+    DOTFILES_X11_KEYMAP="$LOCALE_X11" \
+    LOCALE_LOG="$LOCALE_LOG" \
+    "$TEST_ROOT/modules/05-locale.sh" notebook "$@" 2>&1)
+  STATUS=$?
+  set -e
+}
+
+# Instalação com `us` puro: nem o vconsole nem o InputClass do Xorg têm variante.
+printf '%s\n' 'KEYMAP=us' 'XKBLAYOUT=us' 'XKBMODEL=pc105' > "$LOCALE_VCONSOLE"
+/usr/bin/rm -f -- "$LOCALE_X11"
+
+locale_before=$(cat "$LOCALE_VCONSOLE")
+run_locale_module --dry-run
+assert_success "dry-run de teclado divergente"
+assert_contains "$OUTPUT" 'dry-run: sudo localectl set-x11-keymap us pc105 intl' \
+  "dry-run de teclado divergente"
+assert_contains "$OUTPUT" 'dry-run: sudo localectl set-keymap us-acentos' \
+  "dry-run de teclado divergente"
+[[ $(cat "$LOCALE_VCONSOLE") == "$locale_before" ]] || fail "dry-run de teclado escreveu no vconsole"
+[[ ! -e $LOCALE_X11 ]] || fail "dry-run de teclado escreveu o InputClass do Xorg"
+[[ ! -s $LOCALE_LOG ]] || fail "dry-run de teclado chamou localectl"
+
+run_locale_module
+assert_success "aplicação de teclado"
+assert_contains "$OUTPUT" 'teclado convergido: us(intl), console us-acentos' "aplicação de teclado"
+[[ $(<"$LOCALE_LOG") == $'localectl set-x11-keymap us pc105 intl\nlocalectl set-keymap us-acentos' ]] || \
+  fail "comandos de teclado incorretos: $(<"$LOCALE_LOG")"
+
+: > "$LOCALE_LOG"
+run_locale_module
+assert_success "reexecução de teclado"
+assert_contains "$OUTPUT" 'teclado já estava convergido' "reexecução de teclado"
+[[ ! -s $LOCALE_LOG ]] || fail "reexecução de teclado chamou localectl: $(<"$LOCALE_LOG")"
+
+run_locale_module --dry-run
+assert_success "dry-run de teclado convergido"
+assert_contains "$OUTPUT" 'layout X11 já é us pc105 intl' "dry-run de teclado convergido"
+assert_not_contains "$OUTPUT" 'dry-run: sudo localectl' "dry-run de teclado convergido"
+
+# vconsole certo e InputClass do Xorg ausente: o Xorg ainda cairia em `us` puro,
+# então o módulo precisa reescrever os dois.
+/usr/bin/rm -f -- "$LOCALE_X11"
+: > "$LOCALE_LOG"
+run_locale_module --dry-run
+assert_success "dry-run com InputClass ausente"
+assert_contains "$OUTPUT" 'dry-run: sudo localectl set-x11-keymap us pc105 intl' \
+  "dry-run com InputClass ausente"
+assert_not_contains "$OUTPUT" 'dry-run: sudo localectl set-keymap' "dry-run com InputClass ausente"
+pass "teclado planeja, aplica e reconhece us-intl no vconsole e no InputClass do Xorg"
 
 # Máquina recém-instalada: só o que o Omarchy já traz está no PATH e o HOME
 # ainda não tem os arquivos que os módulos anteriores criariam. O dry-run deve

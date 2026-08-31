@@ -91,6 +91,7 @@ dotfiles/
 │   └── common.sh
 ├── modules/
 │   ├── 00-preflight.sh
+│   ├── 05-locale.sh
 │   ├── 10-packages.sh
 │   ├── 20-stow-common.sh
 │   ├── 30-stow-omarchy.sh
@@ -171,16 +172,18 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 
 1. `00-preflight.sh`: validar Omarchy/Arch, rede e, fora do dry-run, `sudo`;
    garantir Git e Stow. No dry-run, apenas relatar instalações necessárias.
-2. `10-packages.sh`: instalar pacotes comuns e do host.
-3. `20-stow-common.sh`: aplicar `stow/common`.
-4. `30-stow-omarchy.sh`: aplicar `stow/omarchy`.
-5. `35-stow-host.sh`: aplicar exatamente `stow/host-<host>`.
-6. `40-shell.sh`: instalar oh-my-zsh/plugins, configurar shell, Git e perfil
+2. `05-locale.sh`: convergir o teclado para `us` `pc105` `intl` e o console para
+   `us-acentos`, via `localectl`.
+3. `10-packages.sh`: instalar pacotes comuns e do host.
+4. `20-stow-common.sh`: aplicar `stow/common`.
+5. `30-stow-omarchy.sh`: aplicar `stow/omarchy`.
+6. `35-stow-host.sh`: aplicar exatamente `stow/host-<host>`.
+7. `40-shell.sh`: instalar oh-my-zsh/plugins, configurar shell, Git e perfil
    secundário do Claude.
-7. `45-kanata.sh`: somente no notebook; copiar/habilitar a unit.
-8. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
-9. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
-10. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
+8. `45-kanata.sh`: somente no notebook; copiar/habilitar a unit.
+9. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
+10. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
+11. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
 
 `lib/common.sh` deve concentrar pelo menos logging, detecção de comando,
 criação de diretório e confirmação. Módulos não devem duplicar essa lógica.

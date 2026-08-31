@@ -1,3 +1,5 @@
+-- kb_layout e kb_variant ficam fora daqui: o input.lua padrao do Omarchy os le
+-- de /etc/vconsole.conf, que o modulo 05-locale converge para us/intl.
 hl.config({
   input = {
     kb_options = "compose:ralt,shift:both_capslock_cancel",
