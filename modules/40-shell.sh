@@ -36,7 +36,15 @@ checkout() {
     die "$name possui alterações locais; atualização recusada: $destination"
   fi
 
+  # rev-parse antes e depois do pull: só conta como mudança o checkout que
+  # realmente avançou de commit.
+  local revision_before revision_after
+  revision_before=$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)
   git -C "$destination" pull --ff-only --quiet
+  revision_after=$(git -C "$destination" rev-parse HEAD 2>/dev/null || true)
+  if [[ $revision_before != "$revision_after" ]]; then
+    summary_change 1 "atualizar $name"
+  fi
   log_info "$name atualizado"
 }
 
@@ -87,6 +95,9 @@ if require_provisioned_command zsh "o módulo 10-packages"; then
   if [[ $current_shell != "$zsh_path" ]]; then
     require_command chsh
     summary_change 1 "trocar shell padrão para $zsh_path"
+    if [[ $DRY_RUN == false ]]; then
+      summary_attention 1 "shell padrão passou a $zsh_path; vale a partir do próximo login"
+    fi
     run_mutating "alterar shell padrão para $zsh_path" chsh -s "$zsh_path"
   else
     log_info "shell padrão já é $zsh_path"
@@ -96,19 +107,30 @@ else
 fi
 
 claude_profile="$HOME/.claude-dio"
-if [[ $DRY_RUN == true ]]; then
-  log_info "dry-run: criar perfil Claude secundário em $claude_profile"
 
-  claude_pending=0
-  [[ -d $claude_profile ]] || claude_pending=$((claude_pending + 1))
+# Comparação somente leitura do perfil secundário, usada nos dois modos: no
+# plano diz o que mudaria, na execução real é medida antes da escrita para o
+# resumo contar o que mudou.
+claude_divergences() {
+  local pending=0
+
+  [[ -d $claude_profile ]] || pending=$((pending + 1))
   [[ -L $claude_profile/CLAUDE.md && \
     $(readlink -- "$claude_profile/CLAUDE.md" 2>/dev/null || true) == "$HOME/.claude/CLAUDE.md" ]] || \
-    claude_pending=$((claude_pending + 1))
+    pending=$((pending + 1))
   printf '%s\n' '{' '  "theme": "dark",' '  "model": "opus"' '}' | \
     cmp -s - "$claude_profile/settings.json" 2>/dev/null || \
-    claude_pending=$((claude_pending + 1))
-  (( claude_pending == 0 )) || summary_change "$claude_pending" \
-    "$claude_pending ajuste(s) no perfil Claude secundário"
+    pending=$((pending + 1))
+
+  printf '%s' "$pending"
+}
+
+claude_pending=$(claude_divergences)
+(( claude_pending == 0 )) || summary_change "$claude_pending" \
+  "$claude_pending ajuste(s) no perfil Claude secundário"
+
+if [[ $DRY_RUN == true ]]; then
+  log_info "dry-run: criar perfil Claude secundário em $claude_profile"
 else
   ensure_dir "$claude_profile"
   ln -sfn -- "$HOME/.claude/CLAUDE.md" "$claude_profile/CLAUDE.md"

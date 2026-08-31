@@ -36,9 +36,12 @@ discover_modules() {
 }
 
 # Agrega o que os módulos registraram e imprime só o que exige atenção. Silêncio
-# aqui significa máquina convergida.
+# aqui significa máquina convergida. O modo decide apenas o tempo verbal: em
+# `plan` as linhas descrevem o que o --dry-run faria, em `apply` o que a
+# execução real fez.
 render_summary() {
   local file=$1
+  local mode=$2
   local module kind count message entry
   local total_changes=0 width=0 label
   local -a modules=()
@@ -67,22 +70,41 @@ render_summary() {
     esac
   done < "$file"
 
-  if (( total_changes == 1 )); then
-    label='1 mudança planejada'
-  elif (( total_changes > 1 )); then
-    label="$total_changes mudanças planejadas"
+  if [[ $mode == apply ]]; then
+    if (( total_changes == 1 )); then
+      label='1 mudança aplicada'
+    elif (( total_changes > 1 )); then
+      label="$total_changes mudanças aplicadas"
+    else
+      label='nenhuma mudança aplicada'
+    fi
   else
-    label='nenhuma mudança planejada'
+    if (( total_changes == 1 )); then
+      label='1 mudança planejada'
+    elif (( total_changes > 1 )); then
+      label="$total_changes mudanças planejadas"
+    else
+      label='nenhuma mudança planejada'
+    fi
   fi
 
   printf '\n'
   if (( total_changes == 0 && ${#attention_entries[@]} == 0 && ${#hold_count[@]} == 0 )); then
-    printf '  nada a fazer: a máquina já está convergida.\n'
+    if [[ $mode == apply ]]; then
+      printf '  nada a fazer: a máquina já estava convergida.\n'
+    else
+      printf '  nada a fazer: a máquina já está convergida.\n'
+    fi
     return 0
   fi
 
   if (( ${#attention_entries[@]} > 0 || ${#hold_count[@]} > 0 )); then
-    printf '  atenção antes de aplicar:\n'
+    if [[ $mode == apply ]]; then
+      printf '  atenção depois de aplicar:\n'
+    else
+      printf '  atenção antes de aplicar:\n'
+    fi
+
     for module in "${modules[@]}"; do
       for entry in ${attention_entries[@]+"${attention_entries[@]}"}; do
         [[ ${entry%%	*} == "$module" ]] || continue
@@ -100,7 +122,11 @@ render_summary() {
     printf '\n'
   fi
 
-  printf '  %s; nada bloqueia.\n' "$label"
+  if [[ $mode == apply ]]; then
+    printf '  %s.\n' "$label"
+  else
+    printf '  %s; nada bloqueia.\n' "$label"
+  fi
 }
 
 join_by_comma() {
@@ -182,14 +208,13 @@ fi
 
 export REPO_ROOT HOST DRY_RUN
 
-SUMMARY_FILE=
-if [[ $DRY_RUN == true ]]; then
-  SUMMARY_FILE=$(mktemp)
-  # Caminho absoluto para o arquivo interno do resumo não passar pelos shims de
-  # teste e ser contabilizado como mutação, como já é feito no 00-preflight.
-  trap '/usr/bin/rm -f -- "${SUMMARY_FILE:-}"' EXIT
-  export DOTFILES_SUMMARY_FILE=$SUMMARY_FILE
-fi
+# O resumo vale para os dois modos: no plano ele conta o que mudaria, na
+# execução real o que os módulos mudaram de fato.
+SUMMARY_FILE=$(mktemp)
+# Caminho absoluto para o arquivo interno do resumo não passar pelos shims de
+# teste e ser contabilizado como mutação, como já é feito no 00-preflight.
+trap '/usr/bin/rm -f -- "${SUMMARY_FILE:-}"' EXIT
+export DOTFILES_SUMMARY_FILE=$SUMMARY_FILE
 
 for module_path in "${selected_paths[@]}"; do
   module_name=${module_path##*/}
@@ -211,6 +236,10 @@ done
 
 log_info "bootstrap concluído para $HOST"
 
-[[ $DRY_RUN == true ]] && render_summary "$SUMMARY_FILE"
+if [[ $DRY_RUN == true ]]; then
+  render_summary "$SUMMARY_FILE" plan
+else
+  render_summary "$SUMMARY_FILE" apply
+fi
 
 exit 0

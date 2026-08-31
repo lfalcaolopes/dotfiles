@@ -110,6 +110,11 @@ if [[ -e $settings_destination ]]; then
 else
   chmod 0644 "$merged_json"
 fi
+# O merge é estável byte a byte, então comparar antes do mv diz se o destino
+# muda de verdade nesta execução.
+if ! cmp -s -- "$merged_json" "$settings_destination"; then
+  summary_change 1 "reescrever o settings.json do VS Code"
+fi
 mv -f -- "$merged_json" "$settings_destination"
 
 declare -A installed=()
@@ -118,14 +123,19 @@ while IFS= read -r extension || [[ -n $extension ]]; do
   [[ -n $extension ]] && installed["${extension,,}"]=1
 done <<< "$installed_output"
 
+installed_extensions=0
 while IFS= read -r extension || [[ -n $extension ]]; do
   [[ -z $extension || $extension == \#* ]] && continue
   [[ $extension != *[[:space:]]* ]] || die \
     "identificador de extensão inválido em $extensions_file: $extension"
   if [[ -z ${installed[${extension,,}]+present} ]]; then
     code --install-extension "$extension"
+    installed_extensions=$((installed_extensions + 1))
   fi
 done < "$extensions_file"
+
+(( installed_extensions == 0 )) || summary_change "$installed_extensions" \
+  "$installed_extensions extensão(ões) do VS Code instalada(s)"
 
 trap - EXIT
 log_info "VS Code convergido"

@@ -118,22 +118,25 @@ fi
 
 require_command sudo
 
-changed=false
+applied=0
 if x11_keymap_diverges; then
   sudo "${x11_command[@]}"
-  changed=true
+  applied=$((applied + 1))
 fi
 
 if vc_keymap_diverges; then
   sudo "${vc_command[@]}"
-  changed=true
+  applied=$((applied + 1))
 fi
 
 if x11_keymap_diverges || vc_keymap_diverges; then
   die "layout de teclado não convergiu após localectl; confira $vconsole e $x11_keymap"
 fi
 
-if [[ $changed == true ]]; then
+if (( applied > 0 )); then
+  summary_change "$applied" "$applied ajuste(s) de teclado aplicado(s)"
+  summary_attention "$applied" \
+    "teclado passou a $TARGET_LAYOUT($TARGET_VARIANT); a sessão aberta só muda com hyprctl reload"
   log_info "teclado convergido: $TARGET_LAYOUT($TARGET_VARIANT), console $TARGET_KEYMAP"
   log_info "a sessão já aberta assume o layout depois de hyprctl reload"
 else

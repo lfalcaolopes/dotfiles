@@ -44,6 +44,7 @@ if [[ $DRY_RUN == true ]]; then
   if (( ${#missing[@]} > 0 )); then
     log_info "dry-run: seriam instalados: ${missing[*]}"
     log_info "dry-run: $(shell_join sudo pacman -S --needed --noconfirm "${missing[@]}")"
+    summary_change "${#missing[@]}" "${#missing[@]} pacote(s) base a instalar"
   else
     log_info "Git e Stow já estão disponíveis"
   fi
@@ -57,6 +58,7 @@ sudo -v
 if (( ${#missing[@]} > 0 )); then
   require_command pacman
   sudo pacman -S --needed --noconfirm "${missing[@]}"
+  summary_change "${#missing[@]}" "${#missing[@]} pacote(s) base instalado(s)"
 fi
 
 require_command git

@@ -53,27 +53,31 @@ if (( ${#aur[@]} > 0 )); then
   require_command yay
 fi
 
+# pacman -Qq só consulta o banco local: diz o que falta sem tocar em nada. A
+# consulta roda nos dois modos, para o resumo contar o que o comando instalou
+# de fato; com --needed a chamada é a mesma tenha ou não pacote ausente.
+missing=()
+missing_known=false
+if command_exists pacman; then
+  missing_known=true
+  for package in "${official[@]}" "${aur[@]}"; do
+    pacman -Qq "$package" >/dev/null 2>&1 || missing+=("$package")
+  done
+fi
+
 if [[ $DRY_RUN == true ]]; then
   (( ${#official[@]} == 0 )) || run_mutating \
     "instalar pacotes oficiais" sudo pacman -S --needed --noconfirm "${official[@]}"
   (( ${#aur[@]} == 0 )) || run_mutating \
     "instalar pacotes AUR" yay -S --needed --noconfirm "${aur[@]}"
 
-  # pacman -Qq só consulta o banco local: diz o que falta sem tocar em nada.
-  if command_exists pacman; then
-    missing=()
-    for package in "${official[@]}" "${aur[@]}"; do
-      pacman -Qq "$package" >/dev/null 2>&1 || missing+=("$package")
-    done
-
-    if (( ${#missing[@]} > 0 )); then
-      log_info "dry-run: ausentes nesta máquina: ${missing[*]}"
-      summary_change "${#missing[@]}" "${#missing[@]} pacote(s) a instalar"
-    else
-      log_info "todos os pacotes já estão instalados"
-    fi
-  else
+  if [[ $missing_known == false ]]; then
     summary_hold pacman
+  elif (( ${#missing[@]} > 0 )); then
+    log_info "dry-run: ausentes nesta máquina: ${missing[*]}"
+    summary_change "${#missing[@]}" "${#missing[@]} pacote(s) a instalar"
+  else
+    log_info "todos os pacotes já estão instalados"
   fi
   exit 0
 fi
@@ -84,6 +88,12 @@ fi
 
 if (( ${#aur[@]} > 0 )); then
   yay -S --needed --noconfirm "${aur[@]}"
+fi
+
+if (( ${#missing[@]} > 0 )); then
+  summary_change "${#missing[@]}" "${#missing[@]} pacote(s) instalado(s)"
+else
+  log_info "todos os pacotes já estavam instalados"
 fi
 
 log_info "pacotes convergidos para o host $HOST"

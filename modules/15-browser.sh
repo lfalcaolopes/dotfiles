@@ -69,17 +69,17 @@ if [[ $DRY_RUN == true ]]; then
   exit 0
 fi
 
-changed=false
+applied=0
 if install_diverges; then
   omarchy-install-browser "$TARGET_BROWSER"
   browser_is_installed || die \
     "$TARGET_PACKAGE não foi instalado; confira a saída do omarchy-install-browser"
-  changed=true
+  applied=$((applied + 1))
 fi
 
 if default_diverges; then
   omarchy-default-browser "$TARGET_BROWSER"
-  changed=true
+  applied=$((applied + 1))
 fi
 
 current_browser=$(omarchy-default-browser)
@@ -87,7 +87,10 @@ if install_diverges || default_diverges; then
   die "navegador não convergiu; padrão atual: $current_browser"
 fi
 
-if [[ $changed == true ]]; then
+if (( applied > 0 )); then
+  summary_change "$applied" "$applied ajuste(s) de navegador aplicado(s)"
+  summary_attention "$applied" \
+    "os webapps do Omarchy passaram ao perfil do $TARGET_BROWSER e pedem login de novo"
   log_info "navegador convergido: $TARGET_BROWSER"
   log_info "os webapps do Omarchy agora abrem no perfil do $TARGET_BROWSER"
 else

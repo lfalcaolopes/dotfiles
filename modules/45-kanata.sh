@@ -77,16 +77,22 @@ if [[ $unit_changed == true ]]; then
   fi
   install -m 0644 -- "$unit_source" "$unit_destination"
   systemctl --user daemon-reload
+  summary_change 1 "instalar a unit kanata.service"
 fi
 
 if ! systemctl --user is-enabled --quiet kanata.service; then
   systemctl --user enable kanata.service
+  summary_change 1 "habilitar kanata.service"
 fi
 
 if systemctl --user is-active --quiet kanata.service; then
-  [[ $unit_changed == false ]] || systemctl --user restart kanata.service
+  if [[ $unit_changed == true ]]; then
+    systemctl --user restart kanata.service
+    summary_change 1 "reiniciar kanata.service"
+  fi
 else
   systemctl --user start kanata.service
+  summary_change 1 "iniciar kanata.service"
 fi
 
 log_info "Kanata habilitado e ativo"

@@ -69,7 +69,8 @@ require_provisioned_file() {
   exit 1
 }
 
-# O bootstrap agrega estes registros no resumo final do dry-run. Cada linha é
+# O bootstrap agrega estes registros no resumo final, tanto do plano quanto da
+# execução real. Cada linha é
 # módulo, tipo, contagem e mensagem, separados por tabulação. O resumo mostra
 # atenções e pendências linha a linha e usa as mudanças apenas na contagem
 # total; a mensagem de uma mudança fica no arquivo para diagnóstico. Sem
@@ -84,13 +85,15 @@ summary_record() {
     "${DOTFILES_SUMMARY_MODULE:-desconhecido}" "$kind" "$count" "$message" >> "$file"
 }
 
-# Mudanças que a execução real faria de fato; o módulo já confirmou que o
-# estado atual diverge do desejado.
+# Sob --dry-run, mudanças que a execução real faria; na execução real, mudanças
+# que o módulo acabou de fazer. Nos dois casos o módulo já confirmou que o
+# estado atual divergia do desejado.
 summary_change() {
   summary_record change "$1" "$2"
 }
 
-# Algo que a pessoa precisa conferir antes de aplicar.
+# Algo que a pessoa precisa conferir antes de aplicar, ou saber depois que o
+# módulo aplicou.
 summary_attention() {
   summary_record attention "$1" "$2"
 }
@@ -290,6 +293,14 @@ stow_apply_package() {
       done <<< "$simulation"
     fi
     return 0
+  fi
+
+  (( pending_links == 0 )) || summary_change "$pending_links" \
+    "$pending_links link(s) criado(s)"
+  if (( ${#conflicts[@]} > 0 )); then
+    summary_change "${#conflicts[@]}" "${#conflicts[@]} arquivo(s) substituído(s) por link"
+    summary_attention "${#conflicts[@]}" \
+      "${#conflicts[@]} conflito(s) movido(s) para $backup_dir"
   fi
 
   stow "${stow_args[@]}" "$package"

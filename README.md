@@ -18,8 +18,8 @@ already installed. With Stow present it simulates the symlink plan (`stow -n`)
 instead of just printing the command. Skipping it still works: the dry run
 reports each missing tool as `ainda não existe` and plans the rest.
 
-The last dry run is the real check. Every dry run ends with a verdict that only
-speaks up when something needs you:
+The last dry run is the real check. Every run ends with a verdict that only
+speaks up when something needs you, both in dry run and after applying:
 
 ```text
   atenção antes de aplicar:
@@ -35,6 +35,11 @@ idempotent:
 ```text
   nada a fazer: a máquina já está convergida.
 ```
+
+A real run ends the same way, in the past tense: `atenção depois de aplicar`
+for what is left for you to do by hand (reload the session, log back into a
+webapp, look at the backup directory), then `N mudanças aplicadas.`, or
+`nada a fazer: a máquina já estava convergida.` when nothing changed.
 
 The count is not a tally of commands. Each module probes the current state
 read-only first (`pacman -Qq`, `git config --get`, `systemctl is-active`,
@@ -69,8 +74,11 @@ machine. It checks:
   `kanata --check`.
 - `--dry-run` completes on a machine where nothing is installed yet, and aborts
   when a probe fails, such as an invalid Kanata config.
-- A fully converged fixture ends with `nada a fazer`, and the same fixture with
-  one runtime off its pin and one conflicting file reports both.
+- A fully converged fixture ends with `nada a fazer`, in dry run and in a real
+  run, and the same fixture with one runtime off its pin and one conflicting
+  file reports both.
+- A real run counts what it changed and prints what the person still has to do,
+  such as the `hyprctl reload` a keyboard change needs.
 - Re-running converges instead of duplicating config.
 - An existing file that collides with a managed file gets copied to
   `~/.local/state/dotfiles/backups/<timestamp>/` and verified before the symlink

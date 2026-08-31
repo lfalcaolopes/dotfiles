@@ -158,11 +158,12 @@ Requisitos:
   módulo instalaria, ou um arquivo que ele criaria, é registrada como pendência
   com o módulo responsável, e a execução segue; fora do dry-run a mesma ausência
   é fatal;
-- toda execução em dry-run termina com um resumo agregado pelo bootstrap:
-  conflitos e validações adiadas linha a linha, mais a contagem de mudanças.
-  Silêncio significa máquina convergida. A contagem só inclui o que o módulo
-  confirmou divergente por sondagem somente leitura, nunca o número de comandos
-  que seriam executados;
+- toda execução termina com um resumo agregado pelo bootstrap, em dry-run e na
+  execução real: conflitos, consequências para a sessão e validações adiadas
+  linha a linha, mais a contagem de mudanças. Silêncio significa máquina
+  convergida. A contagem só inclui o que o módulo confirmou divergente por
+  sondagem somente leitura, feita antes da escrita na execução real, nunca o
+  número de comandos executados;
 - propagar falhas com mensagem que identifique o módulo;
 - não assumir que o diretório atual é a raiz do repositório;
 - reexecução deve convergir para o mesmo estado.
@@ -257,6 +258,9 @@ Critérios de aceite:
   quando uma verificação somente leitura reprova;
 - dry-run numa máquina convergida termina com `nada a fazer`, e reage quando um
   runtime sai do pino ou surge um conflito;
+- a execução real numa máquina convergida também termina com `nada a fazer`,
+  conta o que mudou quando há divergência e diz o que ficou para a pessoa fazer
+  a mão;
 - cada valor aceito por `--only` funciona em teste isolado, e nomes com `.sh`
   ou inexistentes são rejeitados antes de qualquer alteração;
 - a suíte usa `HOME` temporário e não altera a estação de trabalho;

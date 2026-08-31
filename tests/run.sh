@@ -1074,6 +1074,35 @@ converged_after=$(find "$CONVERGED_HOME" -mindepth 1 -printf '%P %y %l\n' | sort
 assert_no_mutation "dry-run em máquina convergida"
 pass "dry-run em máquina convergida conclui com nada a fazer"
 
+# Mesma fixture, agora aplicada de verdade: a execução real precisa fechar com o
+# mesmo veredito do plano, senão a pessoa termina o bootstrap sem saber se algo
+# mudou.
+reset_log
+set +e
+OUTPUT=$(env \
+  HOME="$CONVERGED_HOME" \
+  XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_STATE_HOME="$SANDBOX/converged-state" \
+  PATH="$TEST_PATH" \
+  DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
+  DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
+  DOTFILES_OS_RELEASE="$OS_RELEASE" \
+  DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
+  GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
+  GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
+  MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
+  "$BOOTSTRAP" notebook 2>&1)
+STATUS=$?
+set -e
+assert_success "execução real em máquina convergida"
+assert_contains "$OUTPUT" 'nada a fazer: a máquina já estava convergida' \
+  "execução real em máquina convergida"
+assert_not_contains "$OUTPUT" 'atenção depois de aplicar' \
+  "execução real em máquina convergida"
+assert_not_contains "$OUTPUT" 'nada bloqueia' "execução real em máquina convergida"
+pass "execução real em máquina convergida conclui com nada a fazer"
+
 # Mesmo fixture, com um runtime fora do pino e um arquivo conflitante: o resumo
 # precisa reagir, senão o teste anterior não provaria nada.
 printf 'local zsh\n' > "$CONVERGED_HOME/.zshrc.local-conflict"
@@ -1107,6 +1136,56 @@ assert_contains "$OUTPUT" '4 mudanças planejadas; nada bloqueia' \
   "dry-run detecta divergência"
 assert_no_mutation "dry-run detecta divergência"
 pass "dry-run contabiliza conflito e runtimes fora do pino"
+
+# A mesma fixture com os pinos do mise fora do lugar, aplicada de verdade: o
+# resumo final precisa contar o que a execução mudou. O conflito do Stow fica
+# de fora porque o backup depende de cp real, e aqui cp é um shim.
+ln -sfn -- "$TEST_ROOT/stow/common/.zshrc" "$CONVERGED_HOME/.zshrc"
+reset_log
+set +e
+OUTPUT=$(env \
+  HOME="$CONVERGED_HOME" \
+  XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_STATE_HOME="$SANDBOX/divergent-state" \
+  PATH="$TEST_PATH" \
+  DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
+  DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
+  DOTFILES_OS_RELEASE="$OS_RELEASE" \
+  DOTFILES_CURRENT_SHELL="$SHIMS/zsh" \
+  GIT_NAME_FIXTURE='Lucas Falcao Lopes' \
+  GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
+  VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
+  MISE_STATE_FIXTURE='{"node":[{"requested_version":"25.2.1"}]}' \
+  "$BOOTSTRAP" notebook 2>&1)
+STATUS=$?
+set -e
+assert_success "execução real com divergência"
+assert_not_contains "$OUTPUT" 'nada a fazer' "execução real com divergência"
+assert_contains "$OUTPUT" '3 mudanças aplicadas.' "execução real com divergência"
+pass "execução real contabiliza os runtimes que saíram do pino"
+
+# Um módulo que muda algo com consequência para a sessão precisa dizê-lo depois
+# de aplicar, não só no plano.
+printf '%s\n' 'KEYMAP=us' 'XKBLAYOUT=us' 'XKBMODEL=pc105' > "$LOCALE_VCONSOLE"
+/usr/bin/rm -f -- "$LOCALE_X11"
+: > "$LOCALE_LOG"
+set +e
+OUTPUT=$(env \
+  HOME="$TEST_HOME" \
+  PATH="$LOCALE_SHIMS:/usr/bin:/bin" \
+  DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+  DOTFILES_VCONSOLE="$LOCALE_VCONSOLE" \
+  DOTFILES_X11_KEYMAP="$LOCALE_X11" \
+  LOCALE_LOG="$LOCALE_LOG" \
+  "$BOOTSTRAP" notebook --only 05-locale 2>&1)
+STATUS=$?
+set -e
+assert_success "atenção na execução real"
+assert_contains "$OUTPUT" 'atenção depois de aplicar' "atenção na execução real"
+assert_contains "$OUTPUT" 'hyprctl reload' "atenção na execução real"
+assert_contains "$OUTPUT" '2 mudanças aplicadas.' "atenção na execução real"
+assert_not_contains "$OUTPUT" 'nada bloqueia' "atenção na execução real"
+pass "execução real reporta o que a pessoa precisa saber depois de aplicar"
 
 # Navegador: numa instalação limpa que aceitou o padrão do Omarchy o Brave não
 # existe e o padrão é o Chromium, então o módulo precisa planejar os dois passos,

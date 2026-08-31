@@ -109,10 +109,10 @@ assume o layout novo com `hyprctl reload`. O `localectl` também reescreve
 `/etc/X11/xorg.conf.d/00-keyboard.conf`, e o módulo só considera convergido
 quando os dois arquivos batem.
 
-### resumo final do dry-run
+### resumo final
 
-Toda execução com `--dry-run` termina com um veredito. Ele só fala quando há o
-que dizer:
+Toda execução termina com um veredito, no plano e na execução real. Ele só fala
+quando há o que dizer. Sob `--dry-run`:
 
 ```text
   atenção antes de aplicar:
@@ -138,6 +138,24 @@ Numa máquina convergida o resumo vira uma linha:
 ```text
   nada a fazer: a máquina já está convergida.
 ```
+
+A execução real fecha do mesmo jeito, no passado e sem a promessa de que nada
+bloqueia, já que a essa altura tudo já rodou:
+
+```text
+  atenção depois de aplicar:
+    05-locale        teclado passou a us(intl); a sessão aberta só muda com hyprctl reload
+    30-stow-omarchy  5 conflito(s) movido(s) para ~/.local/state/dotfiles/backups/20260831T103608-151748335
+
+  9 mudanças aplicadas.
+```
+
+Aqui o bloco de atenção é o que sobrou para você fazer a mão: recarregar a
+sessão, refazer login num webapp, olhar o que foi para o backup. A contagem
+usa as mesmas sondagens somente leitura do plano, feitas antes de cada escrita,
+então ela diz o que mudou de fato, não quantos comandos rodaram. Numa máquina
+já convergida a execução real termina com
+`nada a fazer: a máquina já estava convergida.`
 
 Ler o log inteiro continua sendo opcional; o resumo é a resposta para "posso
 seguir a vida".

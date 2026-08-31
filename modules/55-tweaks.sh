@@ -22,16 +22,23 @@ if ! require_provisioned_command jq "o Omarchy"; then
   jq_available=false
 fi
 
-# Numa máquina recém-instalada os arquivos abaixo só existem depois que os
-# pacotes e o Stow rodam de verdade, então em dry-run apenas os anotamos.
+# Nenhum terminal está nas listas de pacotes: os quatro configs vêm do próprio
+# Omarchy, e o do ghostty também do 17-terminal quando a máquina ainda não o
+# tinha. Numa máquina recém-instalada eles podem faltar, então em dry-run
+# apenas os anotamos com quem os cria.
 present_specifications=()
 for specification in \
   "alacritty:$alacritty" \
   "foot:$foot" \
   "ghostty:$ghostty" \
   "kitty:$kitty"; do
+  kind=${specification%%:*}
   file=${specification#*:}
-  if require_provisioned_file "$file" "o módulo 10-packages"; then
+  case $kind in
+    ghostty) provider="o Omarchy ou o módulo 17-terminal" ;;
+    *) provider="o Omarchy" ;;
+  esac
+  if require_provisioned_file "$file" "$provider"; then
     present_specifications+=("$specification")
   fi
 done
@@ -105,31 +112,35 @@ if [[ $jq_available == true && $shell_json_available == true ]]; then
     "formato esperado de idle não encontrado em $shell_json"
 fi
 
+# O render já é somente leitura: comparar a saída com o arquivo atual diz quais
+# arquivos a execução real muda. Vale nos dois modos, já que a execução real
+# reescreve os cinco arquivos sem olhar o conteúdo anterior.
+divergent=()
+for specification in ${present_specifications[@]+"${present_specifications[@]}"}; do
+  kind=${specification%%:*}
+  file=${specification#*:}
+  if ! render_terminal "$kind" "$file" | cmp -s - "$file"; then
+    divergent+=("$file")
+  fi
+done
+
+if [[ $jq_available == true && $shell_json_available == true ]]; then
+  if ! jq '.idle.lock = 3600 | .idle.screensaver = 86400' "$shell_json" | \
+    cmp -s - "$shell_json"; then
+    divergent+=("$shell_json")
+  fi
+fi
+
 if [[ $DRY_RUN == true ]]; then
   log_info "dry-run: ajustar fontes dos quatro terminais para 11"
   log_info "dry-run: ajustar idle.lock=3600 e idle.screensaver=86400 em $shell_json"
 
-  # O render já é somente leitura: comparar a saída com o arquivo atual diz se
-  # a execução real mudaria alguma coisa.
-  pending=0
-  for specification in ${present_specifications[@]+"${present_specifications[@]}"}; do
-    kind=${specification%%:*}
-    file=${specification#*:}
-    if ! render_terminal "$kind" "$file" | cmp -s - "$file"; then
-      log_info "dry-run: fonte divergente em $file"
-      pending=$((pending + 1))
-    fi
+  for file in ${divergent[@]+"${divergent[@]}"}; do
+    log_info "dry-run: conteúdo divergente em $file"
   done
 
-  if [[ $jq_available == true && $shell_json_available == true ]]; then
-    if ! jq '.idle.lock = 3600 | .idle.screensaver = 86400' "$shell_json" | \
-      cmp -s - "$shell_json"; then
-      log_info "dry-run: idle divergente em $shell_json"
-      pending=$((pending + 1))
-    fi
-  fi
-
-  (( pending == 0 )) || summary_change "$pending" "$pending arquivo(s) a reescrever"
+  (( ${#divergent[@]} == 0 )) || summary_change "${#divergent[@]}" \
+    "${#divergent[@]} arquivo(s) a reescrever"
   exit 0
 fi
 
@@ -164,5 +175,8 @@ for file in "$alacritty" "$foot" "$ghostty" "$kitty" "$shell_json"; do
 done
 temporary_files=()
 trap - EXIT
+
+(( ${#divergent[@]} == 0 )) || summary_change "${#divergent[@]}" \
+  "${#divergent[@]} arquivo(s) reescrito(s)"
 
 log_info "fontes de terminal e idle convergidos"
