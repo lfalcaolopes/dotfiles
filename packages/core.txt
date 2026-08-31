@@ -4,3 +4,8 @@ dbeaver
 steam
 zsh
 python-pipx
+
+# Ditado por voz. Apesar do sufixo -bin, voxtype-bin vem do repositório
+# omarchy, não do AUR; wtype está em extra. Os dois seguem pelo pacman.
+voxtype-bin
+wtype

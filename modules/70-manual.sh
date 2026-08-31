@@ -88,10 +88,6 @@ if [[ ! -d "$NOTES_DIR/.git" ]]; then
   manual 'clonar o vault do Obsidian' "git clone $NOTES_REMOTE $NOTES_DIR"
 fi
 
-if ! command_exists voxtype && ! package_installed voxtype; then
-  manual 'instalar o ditado' omarchy-voxtype-install
-fi
-
 if ! package_installed 1password; then
   manual 'instalar o 1Password e a extensão do Chromium' \
     omarchy-install-service-1password

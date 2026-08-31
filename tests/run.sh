@@ -37,6 +37,12 @@ printf '{"idle":{"lock":300,"screensaver":600},"local":true}\n' > \
 printf '(defcfg process-unmapped-keys yes)\n' > \
   "$STOW_FIXTURE/host-notebook/.config/kanata/config.kbd"
 
+# O 47-voxtype lê o modelo declarado no config versionado, e não no instalado,
+# então a fixture usa o arquivo real do repositório em vez de um recorte.
+mkdir -p "$STOW_FIXTURE/common/.config/voxtype"
+cp -- "$TEST_ROOT/stow/common/.config/voxtype/config.toml" \
+  "$STOW_FIXTURE/common/.config/voxtype/config.toml"
+
 # O layout de teclado vem do estado do systemd, não do HOME. As fixtures abaixo
 # ficam convergidas e são exportadas para todas as execuções do bootstrap, para
 # o resultado dos testes não depender do teclado da máquina que os roda.
@@ -151,6 +157,7 @@ make_shim curl readonly
   printf '%s\n' 'for argument in "$@"; do'
   printf '%s\n' '  case $argument in'
   printf '%s\n' '    is-enabled|is-active) exit "${SYSTEMCTL_STATE_STATUS:-0}" ;;'
+  printf '%s\n' '    show) printf '\''%s\n'\'' "${SYSTEMCTL_TIMESTAMP_FIXTURE:-}"; exit 0 ;;'
   printf '%s\n' '  esac'
   printf '%s\n' 'done'
   printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
@@ -212,9 +219,39 @@ make_shim omarchy-install-browser
 
 make_shim omarchy-install-terminal
 
+# `voxtype setup gpu` sem flag e `omarchy-hw-vulkan` apenas consultam estado: o
+# primeiro imprime o backend ativo, o segundo procura um ICD em /usr/share. Ligar
+# a GPU é `setup gpu --enable`, com sudo, e esse cai no registro de mutação.
+# The generated shim expands these variables when it runs.
+# shellcheck disable=SC2016
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  printf '%s\n' 'if [[ ${1:-} == setup && ${2:-} == gpu && $# -eq 2 ]]; then'
+  printf '%s\n' '  printf '\''Active backend: %s\n'\'' "${VOXTYPE_BACKEND_FIXTURE:-GPU (Vulkan)}"'
+  printf '%s\n' '  exit 0'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
+  printf '%s\n' 'if [[ ${1:-} == setup && ${2:-} == --download ]]; then'
+  printf '%s\n' '  /usr/bin/mkdir -p "$HOME/.local/share/voxtype/models"'
+  printf '%s\n' '  : > "$HOME/.local/share/voxtype/models/ggml-${4:-}.bin"'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'if [[ ${1:-} == setup && ${2:-} == systemd ]]; then'
+  printf '%s\n' '  /usr/bin/mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"'
+  printf '%s\n' '  : > "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/voxtype.service"'
+  printf '%s\n' 'fi'
+  printf '%s\n' 'exit 0'
+} > "$SHIMS/voxtype"
+
+{
+  printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
+  # The generated shim expands this variable when it runs.
+  # shellcheck disable=SC2016
+  printf '%s\n' 'exit "${OMARCHY_VULKAN_STATUS:-0}"'
+} > "$SHIMS/omarchy-hw-vulkan"
+
 chmod +x "$SHIMS/stow" "$SHIMS/kanata" "$SHIMS/pacman" "$SHIMS/systemctl" \
   "$SHIMS/code" "$SHIMS/mise" "$SHIMS/git" "$SHIMS/omarchy-default-browser" \
-  "$SHIMS/omarchy-default-terminal"
+  "$SHIMS/omarchy-default-terminal" "$SHIMS/voxtype" "$SHIMS/omarchy-hw-vulkan"
 
 export SHIM_LOG
 TEST_PATH="$SHIMS:/usr/bin:/bin"
@@ -227,6 +264,7 @@ run_bootstrap() {
   OUTPUT=$(env \
     HOME="$TEST_HOME" \
     XDG_CONFIG_HOME="$TEST_HOME/.config" \
+    XDG_DATA_HOME="$TEST_HOME/.local/share" \
     PATH="$TEST_PATH" \
     DOTFILES_STOW_DIR="$STOW_FIXTURE" \
     DOTFILES_OS_RELEASE="$OS_RELEASE" \
@@ -354,6 +392,7 @@ set +e
 OUTPUT=$(cd /tmp && env \
   HOME="$TEST_HOME" \
   XDG_CONFIG_HOME="$TEST_HOME/.config" \
+  XDG_DATA_HOME="$TEST_HOME/.local/share" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$STOW_FIXTURE" \
   DOTFILES_OS_RELEASE="$OS_RELEASE" \
@@ -628,6 +667,7 @@ run_shell_module() {
   OUTPUT=$(env \
     HOME="$SHELL_HOME" \
     XDG_CONFIG_HOME="$SHELL_HOME/.config" \
+    XDG_DATA_HOME="$SHELL_HOME/.local/share" \
     PATH="$SHELL_SHIMS:/usr/bin:/bin" \
     DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
     DOTFILES_CURRENT_SHELL="$SHELL_SHIMS/zsh" \
@@ -805,6 +845,7 @@ set +e
 OUTPUT=$(env \
   HOME="$VSCODE_HOME" \
   XDG_CONFIG_HOME="$VSCODE_HOME/.config" \
+  XDG_DATA_HOME="$VSCODE_HOME/.local/share" \
   PATH="$VSCODE_SHIMS:/usr/bin:/bin" \
   DOTFILES_VSCODE_SETTINGS="$VSCODE_HOME/.config/Code/User/settings-link.json" \
   "$TEST_ROOT/modules/50-editors.sh" notebook 2>&1)
@@ -843,6 +884,7 @@ set +e
 OUTPUT=$(env \
   HOME="$TEST_HOME" \
   XDG_CONFIG_HOME="$TEST_HOME/.config" \
+  XDG_DATA_HOME="$TEST_HOME/.local/share" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$STOW_FIXTURE" \
   "$TEST_ROOT/modules/60-mise.sh" desktop 2>&1)
@@ -953,10 +995,10 @@ for real_command in /usr/bin/*; do
   [[ -x $real_command ]] || continue
   ln -sfn -- "$real_command" "$FRESH_BIN/${real_command##*/}"
 done
-for absent in stow zsh mise kanata code; do
+for absent in stow zsh mise kanata code voxtype; do
   rm -f -- "$FRESH_BIN/$absent"
 done
-for command in sudo pacman yay systemctl chsh curl; do
+for command in sudo pacman yay systemctl chsh curl omarchy-hw-vulkan; do
   ln -sfn -- "$SHIMS/$command" "$FRESH_BIN/$command"
 done
 
@@ -965,6 +1007,7 @@ set +e
 OUTPUT=$(env \
   HOME="$FRESH_HOME" \
   XDG_CONFIG_HOME="$FRESH_HOME/.config" \
+  XDG_DATA_HOME="$FRESH_HOME/.local/share" \
   PATH="$FRESH_BIN" \
   DOTFILES_STOW_DIR="$STOW_FIXTURE" \
   DOTFILES_STOW_TARGET="$FRESH_HOME" \
@@ -981,17 +1024,20 @@ for planned in \
   'dry-run: zsh ainda não existe' \
   'dry-run: kanata ainda não existe' \
   'dry-run: mise ainda não existe' \
+  'dry-run: voxtype ainda não existe' \
   'dry-run: code ainda não existe'; do
   assert_contains "$OUTPUT" "$planned" "dry-run em máquina sem stow"
 done
 assert_contains "$OUTPUT" 'bootstrap concluído para notebook' "dry-run em máquina sem stow"
 assert_contains "$OUTPUT" 'atenção antes de aplicar' "dry-run em máquina sem stow"
 assert_contains "$OUTPUT" '5 validações adiadas' "dry-run em máquina sem stow"
+assert_contains "$OUTPUT" '47-voxtype       validação adiada: voxtype' \
+  "dry-run em máquina sem stow"
 assert_contains "$OUTPUT" 'mudanças planejadas; nada bloqueia' "dry-run em máquina sem stow"
 [[ -z $(find "$FRESH_HOME" -mindepth 1 -print) ]] || \
   fail "dry-run em máquina sem stow escreveu no HOME"
 assert_no_mutation "dry-run em máquina sem stow"
-pass "dry-run planeja em máquina recém-instalada sem stow, zsh, kanata nem mise"
+pass "dry-run planeja em máquina recém-instalada sem stow, zsh, kanata, mise nem voxtype"
 
 # Máquina totalmente convergida: o dry-run deve dizer que não há nada a fazer.
 # É a passada final do manual, exercitada de ponta a ponta.
@@ -1015,6 +1061,16 @@ jq -n '{idle:{lock:3600,screensaver:86400},local:true}' > \
 
 cp -- "$TEST_ROOT/config/systemd/kanata.service" \
   "$CONVERGED_HOME/.config/systemd/user/kanata.service"
+
+# O 47-voxtype sonda o modelo pelo arquivo em disco e a unit pelo caminho, não
+# pelo binário, então a fixture reproduz os dois. O nome do arquivo vem do campo
+# model do config versionado.
+CONVERGED_MODEL=$(awk -F'"' '/^model = "/ { print $2 }' \
+  "$TEST_ROOT/stow/common/.config/voxtype/config.toml")
+[[ -n $CONVERGED_MODEL ]] || fail "modelo do voxtype não encontrado no config versionado"
+mkdir -p "$CONVERGED_HOME/.local/share/voxtype/models"
+: > "$CONVERGED_HOME/.local/share/voxtype/models/ggml-$CONVERGED_MODEL.bin"
+: > "$CONVERGED_HOME/.config/systemd/user/voxtype.service"
 
 for checkout in \
   "$CONVERGED_HOME/.oh-my-zsh" \
@@ -1055,6 +1111,7 @@ set +e
 OUTPUT=$(env \
   HOME="$CONVERGED_HOME" \
   XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_DATA_HOME="$CONVERGED_HOME/.local/share" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
   DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
@@ -1064,6 +1121,7 @@ OUTPUT=$(env \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
+  SYSTEMCTL_TIMESTAMP_FIXTURE='Fri 2099-01-01 00:00:00 +0000' \
   "$BOOTSTRAP" notebook --dry-run 2>&1)
 STATUS=$?
 set -e
@@ -1084,6 +1142,7 @@ set +e
 OUTPUT=$(env \
   HOME="$CONVERGED_HOME" \
   XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_DATA_HOME="$CONVERGED_HOME/.local/share" \
   XDG_STATE_HOME="$SANDBOX/converged-state" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
@@ -1094,6 +1153,7 @@ OUTPUT=$(env \
   GIT_EMAIL_FIXTURE='lfalcaolopes@gmail.com' \
   VSCODE_INSTALLED_FIXTURE="$VSCODE_INSTALLED_FIXTURE" \
   MISE_STATE_FIXTURE='{"node":[{"requested_version":"24"}],"pnpm":[{"requested_version":"12"}],"dotnet":[{"requested_version":"10"}]}' \
+  SYSTEMCTL_TIMESTAMP_FIXTURE='Fri 2099-01-01 00:00:00 +0000' \
   "$BOOTSTRAP" notebook 2>&1)
 STATUS=$?
 set -e
@@ -1117,6 +1177,7 @@ set +e
 OUTPUT=$(env \
   HOME="$CONVERGED_HOME" \
   XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_DATA_HOME="$CONVERGED_HOME/.local/share" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
   DOTFILES_STOW_TARGET="$CONVERGED_HOME" \
@@ -1148,6 +1209,7 @@ set +e
 OUTPUT=$(env \
   HOME="$CONVERGED_HOME" \
   XDG_CONFIG_HOME="$CONVERGED_HOME/.config" \
+  XDG_DATA_HOME="$CONVERGED_HOME/.local/share" \
   XDG_STATE_HOME="$SANDBOX/divergent-state" \
   PATH="$TEST_PATH" \
   DOTFILES_STOW_DIR="$TEST_ROOT/stow" \
@@ -1392,9 +1454,100 @@ assert_success "terminal com pacote presente"
   fail "instalador rodou com o pacote presente: $(<"$TERMINAL_LOG")"
 pass "terminal instala, define o padrão e é idempotente nos dois passos"
 
+# Ditado: o módulo converge backend, modelo, serviço e o restart que faz o
+# daemon reler o config. O modelo é sondado pelo arquivo em disco e o backend
+# por `voxtype setup gpu`, que sem flag só imprime o estado.
+VOXTYPE_HOME="$SANDBOX/voxtype-home"
+VOXTYPE_MODEL=$(awk -F'"' '/^model = "/ { print $2 }' \
+  "$TEST_ROOT/stow/common/.config/voxtype/config.toml")
+[[ -n $VOXTYPE_MODEL ]] || fail "modelo do voxtype não encontrado no config versionado"
+mkdir -p "$VOXTYPE_HOME/.config/voxtype"
+cp -- "$TEST_ROOT/stow/common/.config/voxtype/config.toml" \
+  "$VOXTYPE_HOME/.config/voxtype/config.toml"
+
+run_voxtype_module() {
+  set +e
+  OUTPUT=$(env \
+    HOME="$VOXTYPE_HOME" \
+    XDG_CONFIG_HOME="$VOXTYPE_HOME/.config" \
+    XDG_DATA_HOME="$VOXTYPE_HOME/.local/share" \
+    PATH="$TEST_PATH" \
+    DOTFILES_STOW_DIR="$STOW_FIXTURE" \
+    DOTFILES_OS_RELEASE="$OS_RELEASE" \
+    "$@" 2>&1)
+  STATUS=$?
+  set -e
+}
+
+# Nada convergido: backend na CPU, modelo ausente, unit ausente e serviço
+# parado. O plano precisa listar os quatro passos sem tocar em nada.
+reset_log
+run_voxtype_module VOXTYPE_BACKEND_FIXTURE='CPU (AVX2)' SYSTEMCTL_STATE_STATUS=1 \
+  "$BOOTSTRAP" notebook --only 47-voxtype --dry-run
+assert_success "dry-run de voxtype divergente"
+assert_contains "$OUTPUT" 'dry-run: sudo voxtype setup gpu --enable' \
+  "dry-run de voxtype divergente"
+assert_contains "$OUTPUT" "dry-run: modelo '$VOXTYPE_MODEL' ausente" \
+  "dry-run de voxtype divergente"
+assert_contains "$OUTPUT" "voxtype setup --download --model $VOXTYPE_MODEL --no-post-install" \
+  "dry-run de voxtype divergente"
+assert_contains "$OUTPUT" 'dry-run: voxtype setup systemd' "dry-run de voxtype divergente"
+assert_contains "$OUTPUT" 'ocupa mais de 1 GB' "dry-run de voxtype divergente"
+assert_no_mutation "dry-run de voxtype divergente"
+[[ ! -e $VOXTYPE_HOME/.config/systemd/user/voxtype.service ]] || \
+  fail "dry-run de voxtype instalou a unit"
+
+# Sem Vulkan o binário de GPU não roda: o módulo segue e converge o resto em vez
+# de tentar ligar um backend que a máquina não tem.
+reset_log
+run_voxtype_module VOXTYPE_BACKEND_FIXTURE='CPU (AVX2)' OMARCHY_VULKAN_STATUS=1 \
+  "$BOOTSTRAP" notebook --only 47-voxtype --dry-run
+assert_success "dry-run de voxtype sem Vulkan"
+assert_contains "$OUTPUT" 'sem Vulkan nesta máquina' "dry-run de voxtype sem Vulkan"
+assert_not_contains "$OUTPUT" 'setup gpu --enable' "dry-run de voxtype sem Vulkan"
+assert_no_mutation "dry-run de voxtype sem Vulkan"
+
+# Execução real. O backend já está em GPU porque `sudo` é shim e não chegaria a
+# trocar o binário; o que se prova aqui é o download, a unit e o serviço.
+reset_log
+run_voxtype_module "$BOOTSTRAP" notebook --only 47-voxtype
+assert_success "execução real de voxtype"
+assert_contains "$OUTPUT" "voxtype convergido: modelo '$VOXTYPE_MODEL'" \
+  "execução real de voxtype"
+[[ -f $VOXTYPE_HOME/.local/share/voxtype/models/ggml-$VOXTYPE_MODEL.bin ]] || \
+  fail "execução real de voxtype não baixou o modelo"
+[[ -f $VOXTYPE_HOME/.config/systemd/user/voxtype.service ]] || \
+  fail "execução real de voxtype não instalou a unit"
+
+# Reexecução com o daemon subido depois do config: nada a fazer.
+reset_log
+run_voxtype_module SYSTEMCTL_TIMESTAMP_FIXTURE='Fri 2099-01-01 00:00:00 +0000' \
+  "$BOOTSTRAP" notebook --only 47-voxtype
+assert_success "reexecução de voxtype"
+assert_contains "$OUTPUT" "voxtype já estava convergido" "reexecução de voxtype"
+assert_not_contains "$OUTPUT" 'reiniciar voxtype.service' "reexecução de voxtype"
+
+# Config editado no repositório depois da subida do daemon: sem o restart o
+# voxtype seguiria com o modelo antigo até o próximo reboot.
+reset_log
+run_voxtype_module SYSTEMCTL_TIMESTAMP_FIXTURE='Sat 2000-01-01 00:00:00 +0000' \
+  "$BOOTSTRAP" notebook --only 47-voxtype --dry-run
+assert_success "dry-run de voxtype com config mais novo"
+assert_contains "$OUTPUT" 'config mais novo que o daemon' \
+  "dry-run de voxtype com config mais novo"
+assert_no_mutation "dry-run de voxtype com config mais novo"
+
+reset_log
+run_voxtype_module SYSTEMCTL_TIMESTAMP_FIXTURE='Sat 2000-01-01 00:00:00 +0000' \
+  "$BOOTSTRAP" notebook --only 47-voxtype
+assert_success "execução real de voxtype com config mais novo"
+assert_contains "$OUTPUT" 'voxtype convergido' "execução real de voxtype com config mais novo"
+/usr/bin/grep -q 'systemctl --user restart voxtype.service' "$SHIM_LOG" || \
+  fail "config mais novo não reiniciou o daemon: $(<"$SHIM_LOG")"
+pass "voxtype converge backend, modelo, serviço e restart do daemon"
+
 # Passos manuais: o módulo só sonda estado, então a lista final precisa sumir
-# item a item conforme o login, a chave ou o clone aparecem. A sondagem do
-# voxtype consulta o PATH real e por isso não é afirmada aqui.
+# item a item conforme o login, a chave ou o clone aparecem.
 reset_log
 PACMAN_QUERY_STATUS=1 run_bootstrap notebook --only 70-manual --dry-run
 assert_success "checklist manual pendente"

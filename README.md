@@ -49,6 +49,14 @@ would rewrite), so it counts only what would actually change.
 Host is a required argument, not detected from the hostname. `notebook` has the
 internal panel and Kanata; `desktop` has two monitors and no Kanata.
 
+Dictation is set up on both hosts: the config is versioned and linked, and
+`47-voxtype` converges the Vulkan backend, the Whisper model, the service, and
+the restart the daemon needs to reread its config. The first run downloads a
+model larger than 1 GB, which the verdict warns about before applying. Change
+dictation settings in `stow/common/.config/voxtype/config.toml`, never through
+`voxtype configure`: it writes by atomic rename and replaces the symlink with a
+plain file, silently.
+
 ## layout
 
 ```text
@@ -80,6 +88,9 @@ machine. It checks:
 - A real run counts what it changed and prints what the person still has to do,
   such as the `hyprctl reload` a keyboard change needs.
 - Re-running converges instead of duplicating config.
+- Voxtype plans the GPU switch, the model download and the service, applies
+  them, skips the GPU step on a machine without Vulkan, and restarts the daemon
+  when the config is newer than the running service.
 - An existing file that collides with a managed file gets copied to
   `~/.local/state/dotfiles/backups/<timestamp>/` and verified before the symlink
   replaces it. `stow --adopt` is never used, and a directory with local content
@@ -92,7 +103,7 @@ No secrets, tokens, keys, browser profiles, or history. `~/.ssh`, `~/.gnupg`,
 `mise`, VS Code, or systemd rewrite on their own are set by command or merge, so
 they never become symlinks.
 
-Logins, personal keys, and the 1Password and voxtype installs are in
+Logins, personal keys, and the 1Password install are in
 [`docs/MANUAL.md`](docs/MANUAL.md). Every run ends by listing the ones a
 read-only probe still finds undone, so the checklist is on screen instead of
 only in the docs.

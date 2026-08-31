@@ -1,0 +1,68 @@
+# Ditado por voz do Omarchy, versionado neste repositório.
+#
+# ATENÇÃO: este arquivo é um link para stow/common/.config/voxtype/config.toml.
+# `voxtype configure` e `voxtype config set` gravam por rename atômico, o que
+# substitui o link por um arquivo comum sem avisar e deixa a edição fora do
+# repositório. Edite aqui e rode `./bootstrap.sh <host>`; o módulo 47-voxtype
+# reinicia o daemon quando este arquivo fica mais novo que o serviço.
+#
+# O esquema do voxtype exige quase todos os campos, sem defaults internos, então
+# o arquivo é completo em vez de um delta sobre o default do Omarchy.
+
+# Estado do daemon ("idle", "recording", "transcribing") para integrações.
+# As bindings do Omarchy usam `voxtype record toggle`, que depende dele.
+state_file = "auto"
+
+[hotkey]
+# Quem captura F9 e SUPER + CTRL + X é o Hyprland, por
+# /usr/share/omarchy/default/hypr/bindings/voxtype.lua. Ligar aqui faria o
+# voxtype abrir um segundo caminho de captura por evdev, disparando duas vezes.
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+
+# O default do Omarchy corta em 60s. 300s cobre ditar parágrafos inteiros sem
+# perder a segunda metade da frase.
+max_duration_secs = 300
+
+pause_media = true
+
+[audio.feedback]
+# Sem isto não há sinal nenhum de que o microfone está aberto: as três
+# notificações abaixo ficam desligadas para não poluir a tela a cada ditado.
+enabled = true
+theme = "subtle"
+volume = 0.7
+
+[whisper]
+# A máquina tem GPU NVIDIA nos dois hosts, e o 47-voxtype liga o backend Vulkan.
+# Com ele, o large-v3-turbo transcreve na velocidade que o base.en tinha na CPU.
+model = "large-v3-turbo"
+
+# "auto" detecta por gravação, o que cobre ditar em português e em inglês na
+# mesma sessão. Modelos com sufixo .en não aceitam isto: são só inglês.
+language = "auto"
+
+translate = false
+
+[output]
+# Digita na posição do cursor via wtype; cai para a área de transferência quando
+# a janela em foco recusa o teclado sintético.
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 1
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = false
+
+[text]
+# Só existe em inglês no binário ("period", "comma"), então com language = "auto"
+# ficaria inerte em português e ainda comeria essas duas palavras em inglês.
+spoken_punctuation = false
+
+# Termos que o Whisper erra por não conhecer. Chave é o que ele transcreve.
+replacements = { "omarki" = "Omarchy", "omark" = "Omarchy", "hyperland" = "Hyprland", "cavemen mode" = "caveman mode" }

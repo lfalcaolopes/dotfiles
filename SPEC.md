@@ -57,6 +57,14 @@ O bootstrap v1 está concluído quando:
   removida por `systemctl --user disable` e deixa de poder ser habilitada.
 - Configurações completas de terminal e idle não devem ser versionadas; aplicar
   somente os valores desejados sobre os arquivos criados pelo Omarchy.
+- `~/.config/voxtype/config.toml` é a exceção deliberada: ele é symlinkado. O
+  Omarchy o copia uma vez, guardado por `omarchy-done`, e nunca mais o revisita,
+  então o motivo que obriga terminal e idle à edição dirigida não se aplica. O
+  esquema do voxtype também não tem defaults internos para quase nenhum campo,
+  o que torna um delta impossível de representar. O preço é que
+  `voxtype configure` e `voxtype config set` gravam por rename atômico e
+  substituem o link por um arquivo comum, sem erro: quem edita o ditado edita o
+  arquivo versionado e roda o bootstrap.
 - Usar `/usr/bin/grep` em scripts de verificação quando necessário, pois a
   máquina de origem possui uma função interativa chamada `grep`.
 
@@ -100,6 +108,7 @@ dotfiles/
 │   ├── 35-stow-host.sh
 │   ├── 40-shell.sh
 │   ├── 45-kanata.sh
+│   ├── 47-voxtype.sh
 │   ├── 50-editors.sh
 │   ├── 55-tweaks.sh
 │   ├── 60-mise.sh
@@ -194,10 +203,13 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 9. `40-shell.sh`: instalar oh-my-zsh/plugins, configurar shell, Git e perfil
    secundário do Claude.
 10. `45-kanata.sh`: somente no notebook; copiar/habilitar a unit.
-11. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
-12. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
-13. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
-14. `70-manual.sh`: sondar, sem escrever nada, os passos que o bootstrap não
+11. `47-voxtype.sh`: convergir o backend de inferência, o modelo, o serviço do
+    ditado e o restart que faz o daemon reler o config. Depende dos módulos de
+    Stow, porque lê o modelo declarado no config versionado.
+12. `50-editors.sh`: fazer merge do settings e instalar extensões do VS Code.
+13. `55-tweaks.sh`: aplicar fontes de terminal e tempos de idle.
+14. `60-mise.sh`: fixar as linhas de Node, pnpm e .NET.
+15. `70-manual.sh`: sondar, sem escrever nada, os passos que o bootstrap não
     automatiza (logins, chave SSH, clone do vault, instaladores interativos) e
     registrar no resumo os que ainda faltam.
 
@@ -287,6 +299,8 @@ dbeaver
 steam
 zsh
 python-pipx
+voxtype-bin
+wtype
 ```
 
 Criar `packages/host-notebook.txt` com:
@@ -298,7 +312,9 @@ kanata-bin
 Não criar `host-desktop.txt` vazio; o módulo deve aceitar sua ausência.
 
 No módulo, separar pacotes oficiais de AUR. `postman-bin` e `kanata-bin` são
-AUR; os demais estão em repositórios configurados pelo Omarchy. Usar:
+AUR; os demais estão em repositórios configurados pelo Omarchy. Apesar do
+sufixo, `voxtype-bin` vem do repositório `omarchy` e `wtype` de `extra`: os dois
+seguem pelo `pacman`, não pelo `yay`. Usar:
 
 ```bash
 sudo pacman -S --needed --noconfirm ...
@@ -571,7 +587,7 @@ Critérios de aceite:
 - o `host.lua` provisório do desktop passa no parser como no-op; EDID, modo,
   posição e workspaces 6–10 só são aceitos após validação no hardware desktop.
 
-### Fase 5 — shell, kanata e mise
+### Fase 5 — shell, kanata, voxtype e mise
 
 #### Dependências do zsh
 
@@ -595,6 +611,27 @@ Em `45-kanata.sh`, somente para `notebook`:
 
 O caminho `/dev/input/by-path/platform-i8042-serio-0-event-kbd` é válido porque
 essa configuração só existe no host notebook.
+
+#### voxtype
+
+O ditado tem duas metades. O config vive em
+`stow/common/.config/voxtype/config.toml` e chega por link; o `47-voxtype.sh`
+cuida do que não cabe num arquivo, nos dois hosts:
+
+- ligar o backend Vulkan com `sudo voxtype setup gpu --enable`, e somente quando
+  `omarchy-hw-vulkan` encontra um ICD. Sem GPU o módulo segue no backend de CPU
+  em vez de abortar;
+- baixar o modelo declarado em `[whisper]`, sondado pelo arquivo
+  `~/.local/share/voxtype/models/ggml-<modelo>.bin`;
+- instalar, habilitar e iniciar `voxtype.service`;
+- reiniciar o serviço quando o config estiver mais novo que a subida do daemon.
+  O daemon lê o arquivo só ao subir, e como ele é um link para o repositório,
+  editá-lo lá não avisaria ninguém.
+
+As bindings F9 e `SUPER + CTRL + X` vêm do próprio Omarchy, em
+`/usr/share/omarchy/default/hypr/bindings/voxtype.lua`, e não são versionadas.
+`[hotkey] enabled = false` existe para o voxtype não abrir um segundo caminho de
+captura por evdev em cima delas.
 
 #### mise e linguagens obrigatórias
 
@@ -756,7 +793,9 @@ bloqueio de hardware encontrado.
 | VS Code extensions | comandos `code` | VS Code |
 | terminal font size e idle | edição dirigida | Omarchy + módulo |
 | navegador e terminal padrão | comandos do Omarchy | módulo |
-| tema, logins, voxtype, vault `~/notes` | manual | usuário/Omarchy |
+| `voxtype/config.toml` | Stow common | repositório |
+| backend, modelo e serviço do voxtype | comandos `voxtype` | módulo |
+| tema, logins, vault `~/notes` | manual | usuário/Omarchy |
 
 Use esta tabela para decidir onde colocar qualquer configuração nova.
 
@@ -767,7 +806,8 @@ Não reabrir estas decisões durante o v1 sem nova evidência ou pedido do usuá
 - oh-my-zsh fica; somente o plugin `git` sai;
 - nvm sai e mise governa Node, pnpm e .NET;
 - linguagens usam linhas LTS/major, não `latest`;
-- voxtype é manual; hyprvoice não entra;
+- voxtype é automatizado pelo `47-voxtype.sh` e seu config é versionado;
+  hyprvoice não entra;
 - Brave substitui Opera e usa o launcher nativo do Omarchy;
 - configurações são divididas em `common`, `omarchy` e `host-*`;
 - `settings.json` do VS Code é merge, não symlink;

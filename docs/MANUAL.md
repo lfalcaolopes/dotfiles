@@ -109,6 +109,33 @@ assume o layout novo com `hyprctl reload`. O `localectl` também reescreve
 `/etc/X11/xorg.conf.d/00-keyboard.conf`, e o módulo só considera convergido
 quando os dois arquivos batem.
 
+### ditado por voz
+
+O `47-voxtype` converge o ditado nos dois hosts. Na primeira execução ele baixa
+o modelo declarado em `stow/common/.config/voxtype/config.toml`, hoje o
+`large-v3-turbo`, que passa de 1 GB e sai pela rede: reserve o tempo do download
+ou rode o bootstrap com o resto já convergido.
+
+O módulo também liga o backend Vulkan quando `omarchy-hw-vulkan` encontra um ICD,
+o que exige `sudo`. Numa máquina sem GPU ele registra o fato e segue no backend
+de CPU; ali vale trocar o modelo por `small` ou `base` no config versionado,
+porque o `large-v3-turbo` não roda em tempo real só com AVX2.
+
+Para mudar qualquer preferência do ditado, edite
+`stow/common/.config/voxtype/config.toml` e rode o bootstrap. O módulo compara a
+data do arquivo com a subida do daemon e reinicia `voxtype.service` quando o
+config está mais novo, porque o voxtype lê a configuração uma única vez, ao
+subir.
+
+Não use `voxtype configure` nem `voxtype config set`. Os dois gravam por rename
+atômico, o que substitui o link do Stow por um arquivo comum sem emitir erro: a
+edição fica fora do repositório e a execução seguinte do bootstrap a move para
+`~/.local/state/dotfiles/backups/<timestamp>/`, avisando no resumo.
+
+As teclas são do Omarchy, não deste repositório: F9 mantido dita enquanto a
+tecla estiver pressionada e `SUPER + CTRL + X` alterna. Elas vêm de
+`/usr/share/omarchy/default/hypr/bindings/voxtype.lua`.
+
 ### resumo final
 
 Toda execução termina com um veredito, no plano e na execução real. Ele só fala
@@ -176,10 +203,7 @@ Depois do veredito vem a lista do que o bootstrap nunca vai fazer por você:
     5. clonar o vault do Obsidian
        git clone git@github.com:lfalcaolopes/notes.git ~/notes
 
-    6. instalar o ditado
-       omarchy-voxtype-install
-
-    7. instalar o 1Password e a extensão do Chromium
+    6. instalar o 1Password e a extensão do Chromium
        omarchy-install-service-1password
 ```
 
@@ -190,8 +214,8 @@ só existe na interface gráfica, como o login do VS Code, aparece sem comando.
 O módulo `70-manual` monta essa lista com sondagens somente leitura:
 `~/.config/gh/hosts.yml` para o `gh`, incluindo o `git_protocol` gravado ali,
 uma chave pública em `~/.ssh`, o
-`loginusers.vdf` da Steam, `~/notes/.git` para o vault, o `voxtype` no PATH e o
-`1password` no `pacman -Qq`. Cada item some sozinho na execução seguinte assim
+`loginusers.vdf` da Steam, `~/notes/.git` para o vault e o `1password` no
+`pacman -Qq`. Cada item some sozinho na execução seguinte assim
 que o passo é feito. O login do GitHub dentro do VS Code fica no keyring do
 sistema e não é legível daqui, então continua listado sempre, marcado como não
 verificável.
@@ -315,13 +339,7 @@ continuam fora dos dotfiles.
 ## 4. instalar componentes interativos
 
 1. Instale o 1Password pelo menu do Omarchy.
-2. Se desejar ditado, instale o voxtype com:
-
-   ```bash
-   omarchy-voxtype-install
-   ```
-
-3. Clone o vault do Obsidian em `~/notes`:
+2. Clone o vault do Obsidian em `~/notes`:
 
    ```bash
    git clone git@github.com:lfalcaolopes/notes.git ~/notes
@@ -329,10 +347,10 @@ continuam fora dos dotfiles.
 
    O alias `notes` e o autocommit do `hypr-close-window` dependem desse
    diretório ser um repositório Git; sem ele o script sai sem fazer nada.
-4. Transfira arquivos VPN por um canal seguro e recrie aliases ou comandos
+3. Transfira arquivos VPN por um canal seguro e recrie aliases ou comandos
    locais fora deste repositório. Arquivos `.ovpn` e credenciais não são
    versionados.
-5. Aplique o tema built-in:
+4. Aplique o tema built-in:
 
    ```bash
    omarchy theme set hackerman
@@ -384,6 +402,9 @@ Confirme os seguintes pontos:
   `StartupWMClass`, e precisa ser confirmada em `hyprctl clients`;
 - layout us-intl ativo: `hyprctl getoption input:kb_variant` responde `intl` e
   `'` seguido de `a` produz `á`;
+- `systemctl --user status voxtype.service` ativo, e F9 mantido digitando o
+  texto ditado na janela em foco. `voxtype setup gpu` deve responder
+  `Active backend: GPU (Vulkan)` numa máquina com Vulkan;
 - no notebook, `systemctl --user status kanata.service` e o comportamento
   físico das teclas: Caps toca Escape e, mantido, abre a camada de navegação
   com as setas em `hjkl`; Caps+Space aplica Caps Lock; Space não ativa camada
