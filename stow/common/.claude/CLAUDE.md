@@ -46,3 +46,19 @@ reproducing verbatim.
 
 These rules remove padding, not substance. Do not overcorrect into clipped
 staccato prose, and do not drop caveats or qualifications that carry meaning.
+
+## TL;DR
+
+Long or detailed answers end with a `## TL;DR` section: the conclusion, the
+decisions made, and anything I have to act on.
+
+- Only for answers that are long enough to be worth compressing: roughly more
+  than a screen, several sections, or more than one recommendation. Short
+  answers end when they end.
+- Three to five bullets, or two or three sentences. If it does not fit, the
+  answer above it is unfocused.
+- New readable content, not a table of contents. Say the finding, not "covered
+  the config and the tradeoffs".
+- Include open questions, blockers, and anything I still have to decide or run.
+- This is the one exception to the ban on conclusion scaffolding. It does not
+  license "In summary" anywhere else.
