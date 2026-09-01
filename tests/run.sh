@@ -1614,4 +1614,19 @@ for lua_file in $(find "$TEST_ROOT/stow" -type f -name '*.lua' | sort); do
 done
 pass "scripts Bash, JSON, JSONC e Lua passam nos parsers"
 
+bindings_file="$TEST_ROOT/stow/omarchy/.config/hypr/bindings.lua"
+for binding in \
+  'hl.unbind("ALT + TAB")' \
+  'hl.unbind("ALT + SHIFT + TAB")' \
+  'hl.unbind("CTRL + ALT + TAB")' \
+  'hl.unbind("CTRL + ALT + SHIFT + TAB")' \
+  'o.bind("ALT + TAB", "Focus on next monitor", hl.dsp.focus({ monitor = "+1" }))' \
+  'o.bind("ALT + SHIFT + TAB", "Focus on previous monitor", hl.dsp.focus({ monitor = "-1" }))' \
+  'o.bind("CTRL + ALT + TAB", "Focus on next window", hl.dsp.window.cycle_next())' \
+  'o.bind("CTRL + ALT + SHIFT + TAB", "Focus on previous window", hl.dsp.window.cycle_next({ next = false }))'
+do
+  grep -Fqx -- "$binding" "$bindings_file" || fail "binding ausente: $binding"
+done
+pass "Alt-Tab e Ctrl-Alt-Tab trocam ciclagem de monitores e janelas"
+
 printf '1..%d\n' "$TESTS_RUN"

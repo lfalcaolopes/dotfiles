@@ -490,6 +490,9 @@ Popular `stow/omarchy` apenas com overrides:
 
 - Manter as duas bindings de `hypr-close-window`.
 - Definir `binds.workspace_back_and_forth = true`.
+- Trocar os atalhos de ciclagem de janelas e monitores: `Alt-Tab`/`Alt-Shift-Tab`
+  focam o próximo/anterior monitor, enquanto `Ctrl-Alt-Tab`/
+  `Ctrl-Alt-Shift-Tab` focam a próxima/anterior janela e a trazem ao topo.
 - Remover as duas bindings de `hyprvoice`; o voxtype nativo usa F9.
 - Chamar `hypr-close-window` sem caminho absoluto de usuário.
 
