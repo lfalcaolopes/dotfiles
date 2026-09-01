@@ -38,6 +38,17 @@ alias claude-dio='CLAUDE_CONFIG_DIR="$HOME/.claude-dio" "$HOME/.local/bin/claude
 alias kanata-start='systemctl --user enable --now kanata.service'
 alias kanata-stop='systemctl --user disable --now kanata.service'
 
+teach-new() {
+  if [[ -z "$1" ]]; then
+    echo "usage: teach-new <course name>" >&2
+    return 1
+  fi
+  local d="$HOME/notes/Teach/$1"
+  mkdir -p "$d/notebook" || return 1
+  [[ -f "$d/notebook/Log.md" ]] || : > "$d/notebook/Log.md"
+  cd "$d"
+}
+
 eval "$(mise activate zsh)"
 eval "$(starship init zsh)"
 eval "$(zoxide init zsh)"
