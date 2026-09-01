@@ -1,0 +1,12 @@
+# Run omarchy-restart-xcompose to apply changes
+
+# Include fast emoji access
+include "/usr/share/omarchy/default/xcompose"
+
+# Brazilian Portuguese cedilla on the US International dead-acute key.
+<dead_acute> <c> : "ç"
+<dead_acute> <C> : "Ç"
+
+# Identification
+<Multi_key> <space> <n> : "Lucas Falcao Lopes"
+<Multi_key> <space> <e> : "lfalcaolopes@gmail.com"

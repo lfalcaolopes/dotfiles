@@ -1629,4 +1629,14 @@ do
 done
 pass "Alt-Tab e Ctrl-Alt-Tab trocam ciclagem de monitores e janelas"
 
+xcompose_file="$TEST_ROOT/stow/omarchy/.XCompose"
+for sequence in \
+  'include "/usr/share/omarchy/default/xcompose"' \
+  '<dead_acute> <c> : "ç"' \
+  '<dead_acute> <C> : "Ç"'
+do
+  grep -Fqx -- "$sequence" "$xcompose_file" || fail "sequência XCompose ausente: $sequence"
+done
+pass "XCompose produz cedilha com dead-acute seguido de C"
+
 printf '1..%d\n' "$TESTS_RUN"

@@ -479,12 +479,20 @@ Critérios de aceite:
 Popular `stow/omarchy` apenas com overrides:
 
 ```text
+.XCompose
 .config/hypr/bindings.lua
 .config/hypr/input.lua
 .config/hypr/looknfeel.lua
 .config/hypr/hyprland.lua
 .config/hypr/monitors.lua
 ```
+
+#### `.XCompose`
+
+- Incluir as sequências Compose padrão do Omarchy.
+- No layout US International, mapear `dead_acute` seguido de `c`/`C` para
+  `ç`/`Ç`, conforme a convenção do português brasileiro.
+- Preservar as sequências de identificação personalizadas.
 
 #### `bindings.lua`
 
