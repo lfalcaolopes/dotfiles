@@ -10,14 +10,15 @@ parse_module_args "$@"
 
 # O instalador do Omarchy pergunta o navegador uma única vez e grava a escolha
 # em ~/.config/mimeapps.list; numa instalação limpa que aceitou o padrão o
-# resultado é o Chromium. O .zshrc do repositório já exporta BROWSER=brave, então
+# resultado é o Chromium. O .zshrc do repositório já exporta
+# BROWSER=zen-browser, então
 # convergir aqui evita a variável apontar para um binário inexistente.
 #
-# Os dois comandos abaixo são do próprio Omarchy: o instalador também cria o
-# diretório de políticas, copia o chromium-flags.conf e aplica o tema atual,
-# coisas que um `yay -S brave-bin` cru deixaria de fora.
-readonly TARGET_BROWSER=brave
-readonly TARGET_PACKAGE=brave-bin
+# Os dois comandos abaixo são do próprio Omarchy: o instalador também configura
+# as políticas do Firefox e habilita o backend Wayland, coisas que um
+# `yay -S zen-browser-bin` cru deixaria de fora.
+readonly TARGET_BROWSER=zen
+readonly TARGET_PACKAGE=zen-browser-bin
 
 require_command omarchy-install-browser
 require_command omarchy-default-browser
@@ -31,9 +32,9 @@ browser_is_installed() {
   pacman -Qq "$TARGET_PACKAGE" >/dev/null 2>&1
 }
 
-# O instalador não é idempotente: ele copia o flags file por cima a cada
-# execução. Só o chamamos quando o pacote falta, para não descartar ajustes
-# locais em ~/.config/brave-flags.conf.
+# Só chamamos o instalador quando o pacote falta. Além de evitar trabalho
+# desnecessário, isso mantém instalação e seleção do padrão como convergências
+# independentes.
 install_diverges() {
   ! browser_is_installed
 }
@@ -64,7 +65,7 @@ if [[ $DRY_RUN == true ]]; then
   if (( pending > 0 )); then
     summary_change "$pending" "$pending ajuste(s) de navegador a aplicar"
     summary_attention "$pending" \
-      "webapps do Omarchy passam ao perfil do $TARGET_BROWSER e pedem login de novo"
+      "navegação normal passa ao $TARGET_BROWSER; webapps do Omarchy continuam no Chromium"
   fi
   exit 0
 fi
@@ -90,9 +91,9 @@ fi
 if (( applied > 0 )); then
   summary_change "$applied" "$applied ajuste(s) de navegador aplicado(s)"
   summary_attention "$applied" \
-    "os webapps do Omarchy passaram ao perfil do $TARGET_BROWSER e pedem login de novo"
+    "navegação normal passou ao $TARGET_BROWSER; webapps do Omarchy continuam no Chromium"
   log_info "navegador convergido: $TARGET_BROWSER"
-  log_info "os webapps do Omarchy agora abrem no perfil do $TARGET_BROWSER"
+  log_info "webapps do Omarchy continuam abrindo no Chromium"
 else
   log_info "navegador já estava convergido: $TARGET_BROWSER"
 fi

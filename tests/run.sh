@@ -195,7 +195,7 @@ make_shim curl readonly
 {
   printf '%s\n' '#!/usr/bin/env bash' 'set -Eeuo pipefail'
   printf '%s\n' 'if (($# == 0)); then'
-  printf '%s\n' '  printf '\''%s\n'\'' "${OMARCHY_BROWSER_FIXTURE:-brave}"'
+  printf '%s\n' '  printf '\''%s\n'\'' "${OMARCHY_BROWSER_FIXTURE:-zen}"'
   printf '%s\n' '  exit 0'
   printf '%s\n' 'fi'
   printf '%s\n' 'printf '\''%s %s\n'\'' "${0##*/}" "$*" >> "$SHIM_LOG"'
@@ -1256,7 +1256,7 @@ assert_contains "$OUTPUT" '2 mudanças aplicadas.' "atenção na execução real
 assert_not_contains "$OUTPUT" 'nada bloqueia' "atenção na execução real"
 pass "execução real reporta o que a pessoa precisa saber depois de aplicar"
 
-# Navegador: numa instalação limpa que aceitou o padrão do Omarchy o Brave não
+# Navegador: numa instalação limpa que aceitou o padrão do Omarchy o Zen não
 # existe e o padrão é o Chromium, então o módulo precisa planejar os dois passos,
 # aplicá-los e reconhecer o estado convergido depois.
 BROWSER_SHIMS="$SANDBOX/browser-shims"
@@ -1287,7 +1287,7 @@ mkdir -p "$BROWSER_SHIMS"
   printf '%s\n' 'touch "$BROWSER_STATE/installed"'
 } > "$BROWSER_SHIMS/omarchy-install-browser"
 
-# pacman -Qq brave-bin responde a partir do mesmo estado.
+# pacman -Qq zen-browser-bin responde a partir do mesmo estado.
 # The generated shim expands these variables when it runs.
 # shellcheck disable=SC2016
 {
@@ -1315,25 +1315,25 @@ run_browser_module() {
   set -e
 }
 
-# Instalação limpa: sem Brave e com o Chromium como padrão.
+# Instalação limpa: sem Zen e com o Chromium como padrão.
 /usr/bin/rm -rf -- "$BROWSER_STATE"
 mkdir -p "$BROWSER_STATE"
 printf 'chromium' > "$BROWSER_STATE/default"
 
 run_browser_module --dry-run
 assert_success "dry-run de navegador divergente"
-assert_contains "$OUTPUT" 'dry-run: omarchy-install-browser brave' \
+assert_contains "$OUTPUT" 'dry-run: omarchy-install-browser zen' \
   "dry-run de navegador divergente"
-assert_contains "$OUTPUT" "dry-run: navegador padrão é 'chromium', esperado 'brave'" \
+assert_contains "$OUTPUT" "dry-run: navegador padrão é 'chromium', esperado 'zen'" \
   "dry-run de navegador divergente"
 [[ $(<"$BROWSER_STATE/default") == chromium ]] || fail "dry-run de navegador trocou o padrão"
-[[ ! -e $BROWSER_STATE/installed ]] || fail "dry-run de navegador instalou o Brave"
+[[ ! -e $BROWSER_STATE/installed ]] || fail "dry-run de navegador instalou o Zen"
 [[ ! -s $BROWSER_LOG ]] || fail "dry-run de navegador chamou o Omarchy: $(<"$BROWSER_LOG")"
 
 run_browser_module
 assert_success "aplicação de navegador"
-assert_contains "$OUTPUT" 'navegador convergido: brave' "aplicação de navegador"
-[[ $(<"$BROWSER_LOG") == $'omarchy-install-browser brave\nomarchy-default-browser brave' ]] || \
+assert_contains "$OUTPUT" 'navegador convergido: zen' "aplicação de navegador"
+[[ $(<"$BROWSER_LOG") == $'omarchy-install-browser zen\nomarchy-default-browser zen' ]] || \
   fail "comandos de navegador incorretos: $(<"$BROWSER_LOG")"
 
 : > "$BROWSER_LOG"
@@ -1344,16 +1344,15 @@ assert_contains "$OUTPUT" 'navegador já estava convergido' "reexecução de nav
 
 run_browser_module --dry-run
 assert_success "dry-run de navegador convergido"
-assert_contains "$OUTPUT" 'navegador padrão já é brave' "dry-run de navegador convergido"
+assert_contains "$OUTPUT" 'navegador padrão já é zen' "dry-run de navegador convergido"
 assert_not_contains "$OUTPUT" 'dry-run: omarchy-' "dry-run de navegador convergido"
 
-# Brave instalado mas padrão trocado a mão: só o segundo passo roda, para o
-# instalador não sobrescrever o brave-flags.conf de novo.
+# Zen instalado mas padrão trocado a mão: só o segundo passo roda.
 printf 'chromium' > "$BROWSER_STATE/default"
 : > "$BROWSER_LOG"
 run_browser_module
 assert_success "navegador com pacote presente"
-[[ $(<"$BROWSER_LOG") == 'omarchy-default-browser brave' ]] || \
+[[ $(<"$BROWSER_LOG") == 'omarchy-default-browser zen' ]] || \
   fail "instalador rodou com o pacote presente: $(<"$BROWSER_LOG")"
 pass "navegador instala, define o padrão e é idempotente nos dois passos"
 

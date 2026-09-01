@@ -53,26 +53,25 @@ também usa `sudo`, mas reaproveita o timestamp deixado pelo preflight.
 
 ### navegador padrão
 
-O `15-browser` instala o Brave e o define como navegador padrão, chamando
-`omarchy-install-browser brave` e `omarchy-default-browser brave`. O instalador
-do Omarchy faz mais do que um `yay -S brave-bin`: ele cria o diretório de
-políticas em `/etc/brave/policies/managed`, copia o `chromium-flags.conf` para
-`~/.config/brave-flags.conf` e aplica o tema atual do Omarchy.
+O `15-browser` instala o Zen e o define como navegador padrão, chamando
+`omarchy-install-browser zen` e `omarchy-default-browser zen`. O instalador do
+Omarchy faz mais do que um `yay -S zen-browser-bin`: ele configura as políticas
+compatíveis com Firefox em `/opt/zen-browser/distribution` e habilita o backend
+Wayland com `MOZ_ENABLE_WAYLAND=1`.
 
 O instalador do Omarchy pergunta o navegador uma única vez, durante a
 instalação, e numa máquina que aceitou o padrão o resultado é o Chromium. O
-`.zshrc` do repositório já exporta `BROWSER=brave`, então sem este módulo a
+`.zshrc` do repositório já exporta `BROWSER=zen-browser`, então sem este módulo a
 variável aponta para um binário que não existe.
 
-O módulo só chama o instalador quando `brave-bin` falta, porque ele copia o
-`brave-flags.conf` por cima a cada execução e apagaria ajustes locais. O passo
-do padrão é separado: trocar o navegador a mão e rodar o bootstrap de novo
-reverte a troca sem reinstalar nada.
+O módulo só chama o instalador quando `zen-browser-bin` falta. O passo do padrão
+é separado: trocar o navegador a mão e rodar o bootstrap de novo reverte a
+troca sem reinstalar nada.
 
-Depois da troca os webapps do Omarchy (Discord, WhatsApp, YouTube e os demais)
-passam a abrir no perfil do Brave e pedem login de novo. O
-`omarchy-launch-webapp` reconhece o Brave na lista de navegadores suportados,
-então nenhum atalho quebra.
+O Zen passa a abrir links e navegação normal. Os webapps do Omarchy (Discord,
+WhatsApp, YouTube e os demais) continuam no Chromium: o
+`omarchy-launch-webapp` só oferece modo app para navegadores Chromium e usa o
+Chromium como fallback quando o navegador padrão é Firefox ou Zen.
 
 ### terminal padrão
 
@@ -397,7 +396,7 @@ Confirme os seguintes pontos:
 - nenhum erro de configuração do Hyprland;
 - Acer QG241Y P operando próximo de 165 Hz e com workspaces 1–5;
 - no notebook, `eDP-1` com workspaces 6–10;
-- Brave, Code, DBeaver, Postman, Steam e WhatsApp nos workspaces definidos;
+- Zen, Code, DBeaver, Postman, Steam e WhatsApp nos workspaces definidos;
 - classe real do DBeaver. A regra atual usa `^([dD][bB]eaver)$`, inferida de
   `StartupWMClass`, e precisa ser confirmada em `hyprctl clients`;
 - layout us-intl ativo: `hyprctl getoption input:kb_variant` responde `intl` e

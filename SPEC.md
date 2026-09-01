@@ -193,7 +193,7 @@ que isso exige `stow -D host-<antigo>` antes da nova execução.
 2. `05-locale.sh`: convergir o teclado para `us` `pc105` `intl` e o console para
    `us-acentos`, via `localectl`.
 3. `10-packages.sh`: instalar pacotes comuns e do host.
-4. `15-browser.sh`: instalar o Brave e defini-lo como navegador padrão, pelos
+4. `15-browser.sh`: instalar o Zen e defini-lo como navegador padrão, pelos
    comandos do próprio Omarchy.
 5. `17-terminal.sh`: instalar o ghostty e defini-lo como terminal padrão, pelos
    comandos do próprio Omarchy.
@@ -221,7 +221,7 @@ criação de diretório e confirmação. Módulos não devem duplicar essa lógi
 Numa instalação nova, a ordem externa ao bootstrap é:
 
 1. concluir a instalação limpa do Omarchy;
-2. instalar Brave e defini-lo como navegador padrão;
+2. instalar Zen e defini-lo como navegador padrão;
 3. clonar este repositório;
 4. executar `./bootstrap.sh notebook` ou `./bootstrap.sh desktop`;
 5. concluir os passos interativos de `docs/MANUAL.md`, que o `70-manual.sh`
@@ -532,12 +532,12 @@ snap.enabled = true
 - Aplicar as regras abaixo:
 
 ```lua
-o.window("^([bB]rave-browser)$", { workspace = "1 silent" })
+o.window("^(zen)$",             { workspace = "1 silent" })
 o.window("^(code)$",             { workspace = "2 silent" })
 o.window("^([dD][bB]eaver)$",    { workspace = "3 silent" })
 o.window("^([Pp]ostman)$",       { workspace = "4 silent" })
 o.window("^([sS]team)$",         { workspace = "5 silent" })
-o.window("^brave-web\.whatsapp\.com__", { workspace = "6 silent" })
+o.window("^chromium-web\.whatsapp\.com__", { workspace = "6 silent" })
 
 o.window("^([sS]team)$",   { tile = true })
 o.window("^([Pp]ostman)$", { tile = true })
@@ -592,7 +592,7 @@ Critérios de aceite:
 - `luac`/parser do Omarchy aceita os arquivos;
 - `hyprctl reload` não produz `configerrors` no notebook;
 - o Acer opera a aproximadamente 165 Hz;
-- Brave, Code, Postman, Steam e WhatsApp caem nos workspaces definidos;
+- Zen, Code, Postman, Steam e WhatsApp caem nos workspaces definidos;
 - validar a classe real do DBeaver com `hyprctl clients`;
 - uma máquina sem touchpad aceita `input.lua` sem erro.
 - o `host.lua` provisório do desktop passa no parser como no-op; EDID, modo,
@@ -765,7 +765,7 @@ Critérios de aceite:
 
 Criar `docs/MANUAL.md` na ordem real de uso:
 
-1. instalar Brave com `omarchy install browser brave` e defini-lo como padrão,
+1. instalar Zen com `omarchy install browser zen` e defini-lo como padrão,
    caso isso não tenha sido feito antes do clone;
 2. gerar uma nova chave SSH;
 3. autenticar o GitHub por SSH (`gh auth login --git-protocol ssh`), que também
@@ -819,7 +819,7 @@ Não reabrir estas decisões durante o v1 sem nova evidência ou pedido do usuá
 - linguagens usam linhas LTS/major, não `latest`;
 - voxtype é automatizado pelo `47-voxtype.sh` e seu config é versionado;
   hyprvoice não entra;
-- Brave substitui Opera e usa o launcher nativo do Omarchy;
+- Zen substitui Opera e usa o launcher nativo do Omarchy para navegação normal;
 - configurações são divididas em `common`, `omarchy` e `host-*`;
 - `settings.json` do VS Code é merge, não symlink;
 - `git/config` e `mise/config.toml` não são versionados;
@@ -847,7 +847,7 @@ Não capturar:
 - wrappers em `~/.local/bin` para claude, codex, copilot, crush, gemini, gh,
   ghui, grok, hunk, omp, opencode, pi e playwright: gerados pelo Omarchy;
 - `~/.local/bin/playwright-cli`: resíduo antigo;
-- `~/.config/BraveSoftware`, `~/.config/brave-flags.conf`: integração nativa,
+- `~/.config/zen`, políticas do Zen e configuração Wayland: integração nativa,
   não perfil de usuário;
 - tema `hackerman`, branding, autostart, `environment.d` e estado em
   `~/.local/state/omarchy/`;
@@ -862,7 +862,7 @@ próprio pertencem a esses repositórios. Não copiá-los para cá.
 | pacote | razão |
 |---|---|
 | `neovim` | já vem via `omarchy-nvim` |
-| `opera` | substituído pelo Brave |
+| `opera` | substituído pelo Zen |
 | `vim` | sem uso relevante; nvim já existe |
 | `zed`, `antigravity`, `cursor-bin` | sem uso recente e ocupam espaço |
 | `nvm` | substituído pelo mise |

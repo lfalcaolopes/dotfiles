@@ -25,7 +25,7 @@ else
   export EDITOR=nvim
 fi
 export SUDO_EDITOR="$EDITOR"
-export BROWSER=brave
+export BROWSER=zen-browser
 
 alias ls='eza --icons --color=auto --group-directories-first'
 alias ll='eza -l --icons --color=auto --group-directories-first'
