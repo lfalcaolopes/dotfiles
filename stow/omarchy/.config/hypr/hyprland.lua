@@ -16,6 +16,7 @@ o.window("^(code)$",             { workspace = "2 silent" })
 o.window("^([dD][bB]eaver)$",    { workspace = "3 silent" })
 o.window("^([Pp]ostman)$",       { workspace = "4 silent" })
 o.window("^([sS]team)$",         { workspace = "5 silent" })
+o.window("^steam_app_[0-9]+$",   { workspace = "8 silent" })
 o.window("^brave-web\\.whatsapp\\.com__", { workspace = "6 silent" })
 
 o.window("^([sS]team)$",   { tile = true })
